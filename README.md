@@ -7,6 +7,7 @@ A single, **LLM-driven maintenance skill** for a [Basic Memory](https://github.c
 ## Start here
 
 - **[memory-garden skill](skills/memory-garden/SKILL.md)** — the complete operational instructions.
+- **[Global Copilot retrieval instructions](snippets/copilot-global-instructions.md)** — a copy-ready, always-on section for searches, bounded reads, graph navigation, freshness, and archive-aware answers.
 - **[Related community work and archiving notes](docs/ecosystem-and-archiving.md)** — projects, upstream behavior, and limitations.
 
 ### Use with GitHub Copilot CLI
@@ -20,6 +21,8 @@ copilot skill list --json
 ~~~
 
 Restart or reload Copilot if necessary, and verify that the skill is discovered. Installing this skill does not change the Basic Memory MCP configuration or session capture extension.
+
+For consistent **ordinary memory retrieval** across all Copilot sessions, copy the section in [`snippets/copilot-global-instructions.md`](snippets/copilot-global-instructions.md) into your existing user-level/global Copilot instructions. Keep that section always-on and concise; the larger `memory-garden` skill is loaded only for explicit maintenance work. The snippet uses the same canonical-vs-source and `archived: true` conventions as the gardener. It is not automatically installed by the PowerShell commands above.
 
 ### Example requests
 
