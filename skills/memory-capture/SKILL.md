@@ -5,6 +5,8 @@ description: "Capture the current state of a working thread or conversation into
 
 # Memory Capture
 
+> Adapted from [Basic Memory upstream `memory-capture`](https://github.com/basicmachines-co/basic-memory/blob/0ad9aa1848baba7374c03168e00d57cdb24c5b14/skills/memory-capture/SKILL.md). Gardener integration adds explicit Boolean archive classification and safe re-capture behavior; preserve upstream synthesis and stable `thread_id` semantics when updating this fork.
+
 Capture the gist of a working thread — the decisions made, insights surfaced, and context built — into a single coherent Basic Memory note that reflects where the thread has landed.
 
 ## Purpose
