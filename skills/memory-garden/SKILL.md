@@ -19,7 +19,7 @@ Obtain or infer from the user's invocation:
 | Folder | Relative directory inside that project | Entire project |
 | Mode | audit / plan / apply / deep | **plan** (read-only proposal) |
 | Focus | e.g. recent sessions, large notes, contradictions, links, lifecycle | All, prioritizing changed/high-value notes |
-| Effort | Small bounded pass or comprehensive review | Bounded pass; disclose coverage |
+| Effort | Review changed/high-value notes or conduct a broader review | Review relevant candidates; disclose actual coverage |
 | Canonical output location | Where durable derived notes may be written | Existing appropriate location **inside authorized write scope**; otherwise ask |
 
 The **write boundary** is exactly the named project and, if provided, the named folder. Do not modify other BM projects or folders. You may read a few relevant notes elsewhere in the **same project** to establish context, but treat them as read-only and clearly label that use. Do not read across projects unless specifically authorized.
@@ -85,14 +85,14 @@ On a first pass, discover files under the authorized folder, not just those retu
 - Relations, broken/ambiguous targets, likely canonical neighbors, and existing archival/supersession markers.
 - Why it merits review and the evidence needed to decide.
 
-Do not read every file body to construct the inventory. A directory listing, frontmatter, headings, search snippets, and small local reads are often enough. For a very large project, inventory a representative subset and report partial coverage.
+Do not read every file body to construct the inventory. A directory listing, frontmatter, headings, search snippets, and small local reads are often enough. For a very large project, use filesystem inventory to discover all paths cheaply, and report any substantive review coverage that remains partial.
 
 ### 4.2 Candidate signals
 
 Prioritize:
 1. Newly changed session captures with decisions, incident resolutions, non-obvious investigations, reusable techniques, or durable pointers that are not yet canonical.
 2. Existing canonical notes contradicted or clarified by newer, better-supported evidence.
-3. Agent-authored notes whose length or topic mixture makes retrieval expensive (soft review signal: roughly **12 KiB or 300 lines**, not an automatic split rule).
+3. Agent-authored notes whose length or topic mixture makes retrieval expensive; use the note's actual usefulness, not a fixed size threshold.
 4. Near-duplicates, fragmented topical knowledge, ambiguous titles, misleading tags, and conflicting metadata.
 5. Broken/ambiguous links, valuable orphan notes, missing high-confidence relations, or overloaded hub notes.
 6. Clearly completed or superseded *non-live* notes that obscure current information.
