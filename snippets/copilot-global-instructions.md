@@ -20,11 +20,11 @@ Basic Memory (BM) is the shared knowledge corpus. The **memory-garden** skill ma
 
 ~~~text
 search_notes(query="token rotation", project="PROJECT", search_type="text",
-             compact=true, page_size=8)
+             compact=True, page_size=8)
 read_note(identifier="security/token-rotation", project="PROJECT",
           start_line=1, end_line=80)
 build_context(url="memory://security/token-rotation", project="PROJECT",
-              depth=1, compact=true, max_related=8)
+              depth=1, compact=True, max_related=8)
 ~~~
 
 Use the **memory-garden** skill only when asked to audit, consolidate, split, curate, or archive knowledge. Ordinary retrieval must not mutate BM notes or interfere with the live checkpoint writer.
