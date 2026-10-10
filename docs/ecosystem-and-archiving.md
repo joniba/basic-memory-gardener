@@ -28,16 +28,25 @@ Upstream [metadata-search](https://github.com/basicmachines-co/basic-memory/blob
 - A filter on search_notes should **not be assumed to propagate into build_context relation expansion**. Inspect neighbor metadata separately.
 - Neither a same-project archive/ folder nor a frontmatter marker automatically establishes current-vs-historical *truth*.
 
-**Decision for v1:** Use **metadata-only archiving in place**:
+**Decision for v1:** Use **metadata-only archive classification in place**. New and reviewed active notes should have:
+
+~~~yaml
+archived: false
+~~~
+
+Notes intentionally removed from the current working set should have:
+
 ~~~yaml
 archived: true
 archived_at: <actual archive decision date>
 archive_reason: <why no longer current>
 ~~~
 
-Only write the archived field when marking an item archived. Leave unmarked legacy notes alone; no corpus-wide archived:false migration. Do not replace task status: done with status: archived. Do not move notes or separate archive projects as part of routine gardening.
+The [customized capture skill](../skills/memory-capture/SKILL.md) writes Boolean `archived: false` on new checkpoints and on safe re-capture of legacy checkpoints. The [gardener skill](../skills/memory-garden/SKILL.md) classifies reviewed notes when authorized, without changing original source content or writing to live checkpoints. **Do not silently backfill imported sources or active checkpoints.** Existing unclassified notes remain discoverable through the unfiltered transition search, but are not returned by `archived: false` equality queries.
 
-This is the **lowest-risk identity/relationship policy**: adding metadata without moving the file should leave its path and link target unchanged. Still verify BM indexing and graph after edits. Search will continue to surface historical notes unless retrieval policy accounts for them; the skill must explicitly distinguish authoritative current notes from archived historical evidence.
+**Steady state:** normal searches explicitly use `metadata_filters={"archived": False}`; historical and gardening searches include `archived: true` and unclassified notes. The [global instructions](../snippets/copilot-global-instructions.md) document the legacy-safe fallback until classification coverage is sufficient. Do not replace task status: done with status: archived, and do not move notes into another project merely to archive them.
+
+This is the **lowest-risk identity/relationship policy**: metadata changes without moves leave paths and link targets stable. Still verify BM indexing and graph after edits. BM does not automatically apply archive state to graph expansion; retrieval clients must check neighbor metadata.
 
 ### Why not a sibling archive project now?
 
@@ -65,7 +74,7 @@ Use temporary non-sensitive notes or a safe existing fixture, not production-wid
 - Background Windows service, scheduler, and automatic restart catch-up.
 - Deterministic file scanner, hash/watermark database, and processing queue.
 - Cross-project archival or mass folder restructuring.
-- Rewriting upstream skills or modifying the Copilot checkpoint bridge.
+- Changing the Copilot checkpoint bridge's runtime or triggers. A customized **copy of the upstream memory-capture skill** is included to set archive metadata.
 - A new vector database, custom MCP server, or automated LLM ingestion pipeline.
 
 The [bridge issue #2](https://github.com/joniba/basic-memory-copilot-bridge/issues/2) records the earlier broader pipeline proposal. Treat it as future options; evaluate this simpler skill first.
