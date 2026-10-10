@@ -5,7 +5,7 @@ description: "Capture the current state of a working thread or conversation into
 
 # Memory Capture
 
-> Adapted from [Basic Memory upstream `memory-capture`](https://github.com/basicmachines-co/basic-memory/blob/0ad9aa1848baba7374c03168e00d57cdb24c5b14/skills/memory-capture/SKILL.md). Gardener integration adds explicit Boolean archive classification and safe re-capture behavior; preserve upstream synthesis and stable `thread_id` semantics when updating this fork.
+> Adapted from [upstream Basic Memory memory-capture](https://github.com/basicmachines-co/basic-memory/blob/0ad9aa1848baba7374c03168e00d57cdb24c5b14/skills/memory-capture/SKILL.md). Gardener integration protects deliberately archived checkpoints while preserving normal capture and stable thread identity.
 
 Capture the gist of a working thread — the decisions made, insights surfaced, and context built — into a single coherent Basic Memory note that reflects where the thread has landed.
 
@@ -27,20 +27,13 @@ Use this skill when:
 
 It is fine — and expected — to invoke this skill multiple times in the same thread as the conversation evolves.
 
-## Archive Classification — Gardener Integration
+## Archive handling (gardener integration)
 
-**Every newly captured note must have explicit Boolean frontmatter `archived: false`.** This makes ordinary active-only Basic Memory searches (`metadata_filters={"archived": False}`) find new session checkpoints. Set it through `write_note(metadata=...)`, not merely by describing it in prose. Do not use the string `"false"`.
+**New captures normally omit the `archived` field entirely.** Missing means *not archived*; do not add `archived: false`. Capture is not responsible for classifying or archiving notes.
 
-**On re-capture, inspect the existing note's frontmatter before overwriting:**
-- `archived: false`: preserve it as false.
-- No `archived` field (legacy checkpoint): add `archived: false` to the replacement.
-- `archived: true`: **do not overwrite, silently unarchive, or create a duplicate with the same thread_id**. The gardener intentionally classified this note as historical. Ask for explicit permission to reactivate it or to capture the new work as a separately identified thread. If reactivation is authorized, change the marker to false using a supported BM edit, then re-read before normal capture.
+Before updating a same-thread checkpoint, read its existing frontmatter. If it has `archived: true`, **stop**: do not overwrite, silently unarchive, or create a duplicate checkpoint with the same `thread_id`. Ask for explicit authorization to reactivate it, or use a genuinely new thread identity if appropriate. An existing `archived: false` is harmless legacy metadata and need not be changed. Preserve unrelated custom metadata on overwrite, including source provenance and stable thread ID.
 
-**Never filter same-thread identity lookup by `archived: false`**: doing so would hide legacy or archived notes and could cause duplicate checkpoints. Lookup by exact `thread_id` alone; only then inspect archive state.
-
-Basic Memory's current `write_note(overwrite=True)` merges unspecified custom frontmatter, but this skill explicitly supplies `archived: False` on normal captures. Preserve other existing metadata (including provenance, `copilot_session_id`, `captured_from`, `cwd`, `repo`, and `branch`) where relevant; don't erase custom fields while rewriting. If available, use `expected_checksum` to prevent overwriting a concurrently changed note. Check the installed BM version's tool schema and write behavior.
-
-This changes only capture note metadata; it does **not** change Copilot bridge triggers, intervals, context thresholds, or thread identities. The separate `memory-garden` skill owns archival decisions.
+**Never filter exact thread identity lookup by archive state.** Such a filter could hide archived checkpoints and cause duplicates. The gardener, not capture, owns decisions to mark non-live historical notes `archived: true`. Keep capture extension triggers and intervals unchanged.
 
 ## Same-Thread Detection
 
@@ -68,12 +61,12 @@ To rewrite the same note on re-capture instead of duplicating, key the note to a
      search_notes(query="<thread topic>", project="<project>")
      ```
 3. **If a match is found:**
-   - Read the existing note (use the full permalink returned by search) and check `archived` frontmatter. If `archived: true`, stop and request explicit reactivation instead of overwriting. If missing, treat it as a legacy checkpoint and add `archived: false` on overwrite.
+   - Read the existing note (use the full permalink returned by search) and inspect `archived` frontmatter. If `archived: true`, stop and request explicit authorization before reactivation. Do not create a duplicate checkpoint.
    - Synthesize a new version that integrates the latest understanding from the conversation
-   - Overwrite via `write_note` with `overwrite=True` and `metadata` containing Boolean `"archived": False` plus the original `thread_id` and relevant existing custom fields (same title and directory; use `expected_checksum` when available).
+   - Overwrite via `write_note` with `overwrite=True` (same title, same `thread_id` if used, same directory)
 4. **If no match is found:**
    - Synthesize the note from the conversation
-   - Always pass `metadata={"archived": False, "thread_id": "<thread-id>"}` to `write_note` when a thread id exists, or `metadata={"archived": False}` without one (custom YAML frontmatter)
+   - If you have a thread id, pass `metadata={"thread_id": "<thread-id>"}` to `write_note` (it surfaces as a custom frontmatter field)
    - Save it
 
 ## Synthesis Rules
@@ -97,7 +90,6 @@ If the user explicitly asks for a separate note (e.g., "capture this as a new no
 ---
 title: <descriptive title for the thread>
 type: note
-archived: false
 thread_id: <thread-id, if your agent exposes one>
 tags:
 - relevant
@@ -164,7 +156,7 @@ write_note(
     content="<markdown body — frontmatter is generated from title/tags/metadata>",
     directory="<folder>",
     tags=["..."],
-    metadata={"archived": False, "thread_id": "<thread-id>"},  # omit thread_id if unavailable
+    metadata={"thread_id": "<thread-id>"},  # omit if no stable id
     project="<project>"
 )
 
@@ -174,7 +166,7 @@ write_note(
     content="<new content>",
     directory="<same folder>",
     tags=["..."],
-    metadata={**existing_custom_metadata, "archived": False, "thread_id": "<same thread-id>"},  # existing_custom_metadata is read from the original note; omit thread_id if unavailable
+    metadata={"thread_id": "<same thread-id>"},  # omit if no stable id
     overwrite=True,
     project="<project>"
 )
@@ -194,7 +186,6 @@ write_note(
 ---
 title: Visual identity — initial decisions
 type: note
-archived: false
 thread_id: 7c1d4a2e-3b5f-4d8a-9e1c-2f6b8a4d7c39
 tags:
 - branding
@@ -241,7 +232,6 @@ Working through the visual identity for the new product. This thread covers the 
 ---
 title: Visual identity — initial decisions
 type: note
-archived: false
 thread_id: 7c1d4a2e-3b5f-4d8a-9e1c-2f6b8a4d7c39
 tags:
 - branding
@@ -290,7 +280,6 @@ Notice that:
 1. **Capture the current state, not the history.** The note represents where the thread has landed.
 2. **Synthesize, don't log.** Each invocation produces a coherent document, not an accumulating record.
 3. **Brief prose for revisions.** A sentence in the section that changed is enough — don't add a changelog.
-4. **Always run the same-thread lookup** before deciding to create or update; never filter identity lookup by `archived: false`.
+4. **Always run the same-thread lookup** before deciding to create or update; do not archive-filter identity lookup.
 5. **Use observations for the structured layer.** Decisions, insights, tradeoffs go in `## Observations` so they're searchable.
 6. **Link relations liberally.** Notes the user might want to reach from this one.
-7. **Always set `archived: false` on new/active captures.** On overwrite, preserve the other frontmatter and refuse to silently reactivate `archived: true` notes.
