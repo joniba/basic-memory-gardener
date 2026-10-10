@@ -1,6 +1,6 @@
 # Related work, archiving, and first-phase decisions
 
-Research notes for the **skill-only** version of Basic Memory Gardener (October 2026). These are design references, not dependencies. Check the installed Basic Memory version before assuming a specific tool signature.
+Research notes for the **LLM-first skill with optional lightweight scripts** version of Basic Memory Gardener (October 2026). These are design references, not dependencies. Check the installed Basic Memory version before assuming a specific tool signature.
 
 ## Existing efforts
 
@@ -28,25 +28,22 @@ Upstream [metadata-search](https://github.com/basicmachines-co/basic-memory/blob
 - A filter on search_notes should **not be assumed to propagate into build_context relation expansion**. Inspect neighbor metadata separately.
 - Neither a same-project archive/ folder nor a frontmatter marker automatically establishes current-vs-historical *truth*.
 
-**Decision for v1:** Use **metadata-only archive classification in place**. New and reviewed active notes should have:
-
-~~~yaml
-archived: false
-~~~
-
-Notes intentionally removed from the current working set should have:
+**Decision for v1:** Use **metadata-only archiving in place**. Ordinary notes omit the archive field; **missing `archived` means not archived**. Only a deliberately retired note receives:
 
 ~~~yaml
 archived: true
 archived_at: <actual archive decision date>
 archive_reason: <why no longer current>
+knowledge_status: superseded
 ~~~
 
-The [customized capture skill](../skills/memory-capture/SKILL.md) writes Boolean `archived: false` on new checkpoints and on safe re-capture of legacy checkpoints. The [gardener skill](../skills/memory-garden/SKILL.md) classifies reviewed notes when authorized, without changing original source content or writing to live checkpoints. **Do not silently backfill imported sources or active checkpoints.** Existing unclassified notes remain discoverable through the unfiltered transition search, but are not returned by `archived: false` equality queries.
+`knowledge_status: superseded` is appropriate only when a verified successor exists; otherwise describe the actual reason. The [customized capture skill](../skills/memory-capture/SKILL.md) does **not** add `archived: false`; it guards against overwriting a checkpoint that has been explicitly archived. The [gardener skill](../skills/memory-garden/SKILL.md) handles archiving of safe, non-live notes, preserving original sources and relations.
 
-**Steady state:** normal searches explicitly use `metadata_filters={"archived": False}`; historical and gardening searches include `archived: true` and unclassified notes. The [global instructions](../snippets/copilot-global-instructions.md) document the legacy-safe fallback until classification coverage is sufficient. Do not replace task status: done with status: archived, and do not move notes into another project merely to archive them.
+**Ordinary retrieval:** search without an archive equality filter, then exclude `archived: true` hits from current answers. `metadata_filters={"archived": False}` would hide normal unmarked notes. Explicit archived:true searches are **discouraged except when the user specifically requests historical information, old-vs-new comparison, or another historical perspective**. The gardener's own internal maintenance review is a separate exception. If archived notes dominate results, use alternate queries/pagination or combine separate missing-field and explicit-false searches; don't silently fall back to archived notes as current authority.
 
-This is the **lowest-risk identity/relationship policy**: metadata changes without moves leave paths and link targets stable. Still verify BM indexing and graph after edits. BM does not automatically apply archive state to graph expansion; retrieval clients must check neighbor metadata.
+**Lightweight incremental review:** the gardener may stamp editable, successfully reviewed notes with `last_gardened_at` and compare that value with filesystem mtime on later runs. A read-only PowerShell helper can inventory candidates; there is no hash manifest or private database. Live checkpoints and immutable source documents are not stamped without special authorization. This is deliberately approximate and may re-review such notes.
+
+This is the **lowest-risk identity/relationship policy**: metadata changes without moves leave paths and link targets stable. Verify BM indexing and graph after edits; archive state is not automatically propagated to graph expansion.
 
 ### Why not a sibling archive project now?
 
@@ -68,13 +65,15 @@ Use temporary non-sensitive notes or a safe existing fixture, not production-wid
 6. Change archived metadata via a supported BM edit operation; verify permalink, incoming/outgoing relations, and search remain intact.
 7. Check whether an archived note outranks a current note for a representative query; if so, evaluate a client-side retrieval rule or future native search filter.
 8. Confirm folder-scoped gardening never edits notes outside the authorized subtree, even when the search index returns them.
+9. Confirm a successfully stamped, unchanged authored note is skipped by the timestamp inventory helper; a later substantive edit makes it eligible. Verify the small post-stamp mtime tolerance.
+10. Confirm the gardener never stamps an active checkpoint merely to record a review.
 
 ## Deliberately deferred
 
 - Background Windows service, scheduler, and automatic restart catch-up.
-- Deterministic file scanner, hash/watermark database, and processing queue.
+- External state manifest, hash-based processing queue, and deterministic semantic-gardening engine. A read-only timestamp inventory helper is included.
 - Cross-project archival or mass folder restructuring.
-- Changing the Copilot checkpoint bridge's runtime or triggers. A customized **copy of the upstream memory-capture skill** is included to set archive metadata.
+- Changing the Copilot checkpoint bridge's runtime or triggers. A customized **copy of the upstream memory-capture skill** is included to protect deliberately archived checkpoints.
 - A new vector database, custom MCP server, or automated LLM ingestion pipeline.
 
 The [bridge issue #2](https://github.com/joniba/basic-memory-copilot-bridge/issues/2) records the earlier broader pipeline proposal. Treat it as future options; evaluate this simpler skill first.
@@ -87,6 +86,7 @@ After several real gardening passes, judge:
 - Did it reduce the need to read large notes, without losing context?
 - Did it preserve historical facts and avoid duplicate canonical accounts?
 - Were the LLM token costs and review burden tolerable?
-- Which repeated mistakes would a deterministic scanner actually prevent?
+- Does the optional timestamp inventory script meaningfully reduce unnecessary repeat review?
+- Which repeated mistakes, if any, justify additional scripting without introducing a new state system?
 
 Only build a service/pipeline for problems demonstrated by these trials.
