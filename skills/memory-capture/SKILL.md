@@ -70,7 +70,7 @@ To rewrite the same note on re-capture instead of duplicating, key the note to a
 3. **If a match is found:**
    - Read the existing note (use the full permalink returned by search) and check `archived` frontmatter. If `archived: true`, stop and request explicit reactivation instead of overwriting. If missing, treat it as a legacy checkpoint and add `archived: false` on overwrite.
    - Synthesize a new version that integrates the latest understanding from the conversation
-   - Overwrite via `write_note` with `overwrite=True`, `metadata={"archived": False, ...existing custom fields}` (same title, same `thread_id` if used, same directory; use `expected_checksum` when available)
+   - Overwrite via `write_note` with `overwrite=True` and `metadata` containing Boolean `"archived": False` plus the original `thread_id` and relevant existing custom fields (same title and directory; use `expected_checksum` when available).
 4. **If no match is found:**
    - Synthesize the note from the conversation
    - Always pass `metadata={"archived": False, "thread_id": "<thread-id>"}` to `write_note` when a thread id exists, or `metadata={"archived": False}` without one (custom YAML frontmatter)
@@ -174,7 +174,7 @@ write_note(
     content="<new content>",
     directory="<same folder>",
     tags=["..."],
-    metadata={"archived": False, "thread_id": "<same thread-id>"},  # include preserved custom metadata; omit thread_id if unavailable
+    metadata={**existing_custom_metadata, "archived": False, "thread_id": "<same thread-id>"},  # existing_custom_metadata is read from the original note; omit thread_id if unavailable
     overwrite=True,
     project="<project>"
 )
