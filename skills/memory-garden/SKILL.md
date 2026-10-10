@@ -102,6 +102,8 @@ Do not promise a zero-token second run: without a deterministic audit/state laye
 
 ## 5. Retrieval strategy: discover cheaply, inspect selectively
 
+The ordinary (non-gardening) Copilot retrieval policy is in [the global-instructions snippet](../../snippets/copilot-global-instructions.md). Keep its rules for canonical-first discovery, bounded reads, archive-aware interpretation, and provenance consistent with this skill when either changes.
+
 For each candidate:
 
 1. **Find the anchor.** Use title/permalink or exact FTS for names, code symbols, error strings, IDs, and deep literal matches. Use semantic/hybrid search for synonyms and conceptual neighbors **only if enabled**.
