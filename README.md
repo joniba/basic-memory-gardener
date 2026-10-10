@@ -7,6 +7,7 @@ A single, **LLM-driven maintenance skill** for a [Basic Memory](https://github.c
 ## Start here
 
 - **[memory-garden skill](skills/memory-garden/SKILL.md)** — the complete operational instructions.
+- **[Customized memory-capture skill](skills/memory-capture/SKILL.md)** — upstream capture behavior with explicit `archived: false` on new/re-captured notes, plus safeguards against silently reactivating archived checkpoints.
 - **[Global Copilot retrieval instructions](snippets/copilot-global-instructions.md)** — a copy-ready, always-on section for searches, bounded reads, graph navigation, freshness, and archive-aware answers.
 - **[Related community work and archiving notes](docs/ecosystem-and-archiving.md)** — projects, upstream behavior, and limitations.
 
@@ -21,6 +22,28 @@ copilot skill list --json
 ~~~
 
 Restart or reload Copilot if necessary, and verify that the skill is discovered. Installing this skill does not change the Basic Memory MCP configuration or session capture extension.
+
+### Use the archive-aware memory-capture skill
+
+The existing [Copilot capture bridge](https://github.com/joniba/basic-memory-copilot-bridge) calls the skill named `memory-capture`; it does **not** write notes itself. This repository includes a **modified copy of upstream `memory-capture` with the same skill name**. To make the bridge write `archived: false` on new and re-captured checkpoints, you must **install/activate this copy in place of the previously active capture skill**. Merely cloning this repository will not change capture behavior.
+
+For a user-level installation, first back up any existing `memory-capture` skill and confirm which source Copilot CLI is loading (including possible plugin-provided copies). Then install the customized copy:
+
+~~~powershell
+$target = Join-Path $HOME '.copilot\skills\memory-capture'
+if (Test-Path $target) {
+  $backup = "$target.backup-$(Get-Date -Format yyyyMMdd-HHmmss)"
+  Copy-Item $target $backup -Recurse -Force
+}
+New-Item -ItemType Directory -Force $target | Out-Null
+Copy-Item '.\skills\memory-capture\SKILL.md' (Join-Path $target 'SKILL.md') -Force
+copilot skill list --json
+~~~
+
+If multiple `memory-capture` skills remain discoverable, resolve the duplicate/precedence using your installed Copilot CLI's skill configuration; do **not** assume the customized copy wins. Restart or reload the session and perform a safe test capture: verify the resulting YAML contains the **Boolean** `archived: false`, retains the original `thread_id`, and preserves the bridge's other metadata. A second capture should update the same note. Do not change the bridge extension, its thresholds, or its timers.
+
+**Transition:** active-only searches with `metadata_filters={"archived": False}` will miss existing notes that lack the field. New capture notes are classified by this skill; legacy captures are classified when safely re-captured; the gardener classifies authorized reviewed notes. Until coverage is sufficient, use the unfiltered legacy-safe retrieval fallback in the global instructions. Historical notes remain available via unfiltered or `archived: True` searches.
+
 
 For consistent **ordinary memory retrieval** across all Copilot sessions, copy the section in [`snippets/copilot-global-instructions.md`](snippets/copilot-global-instructions.md) into your existing user-level/global Copilot instructions. Keep that section always-on and concise; the larger `memory-garden` skill is loaded only for explicit maintenance work. The snippet uses the same canonical-vs-source and `archived: true` conventions as the gardener. It is not automatically installed by the PowerShell commands above.
 
