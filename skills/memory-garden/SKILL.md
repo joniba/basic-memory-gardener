@@ -18,7 +18,7 @@ Obtain or infer from the user's invocation:
 | BM project | Exact registered Basic Memory project name | **Required**; ask if ambiguous |
 | Folder | Relative directory inside that project | Entire project |
 | Focus | e.g. recent sessions, large notes, contradictions, links, lifecycle | All, prioritizing changed/high-value notes |
-| Base branch | Branch to receive approved changes | Repository's intended main/default branch, normally §main§; verify |
+| Base branch | Branch to receive approved changes | Repository's intended main/default branch, normally `main`; verify |
 | Review path | Local diff approval or optional GitHub PR | Ask after preparing a reviewable branch |
 | Canonical output location | Where durable derived notes may be written | Existing appropriate location **inside authorized write scope**; otherwise ask |
 
@@ -51,13 +51,13 @@ The [customized capture skill](../memory-capture/SKILL.md) creates notes without
 
 ## 3. Mandatory Git preflight and isolated worktree
 
-**Fail fast if the BM corpus is not inside a local Git worktree.** No non-Git fallback, automatic §git init§, snapshot copy, or in-place gardening. GitHub is optional for PRs; Git itself is mandatory.
+**Fail fast if the BM corpus is not inside a local Git worktree.** No non-Git fallback, automatic `git init`, snapshot copy, or in-place gardening. GitHub is optional for PRs; Git itself is mandatory.
 
-1. Resolve the registered BM project's **actual local root**. Verify it exists, determine the containing Git repository root with §git rev-parse --show-toplevel§, and confirm §git rev-parse --is-inside-work-tree§ is true. A project may occupy only a subdirectory of a larger repository: preserve that relative path when constructing the gardening worktree. If the BM project cannot be mapped to tracked committed files, stop; untracked/ignored corpus files would not be present in the worktree.
-2. **Before creating a gardening branch, check the *entire* live repository** with §git status --porcelain=v1 --untracked-files=all§ at the Git root, **not just the selected BM folder**. If any tracked changes or untracked files are present, **stop and ask the user to commit or otherwise resolve them**. Do not automatically commit, stash, reset, clean, or discard. Ignored files are not part of Git's committed snapshot; verify no required BM corpus notes are ignored. The live capture writer may make the tree dirty at any time; this is a preflight requirement, **not** a reason to block on later live changes after the worktree has been created.
-3. Verify the intended base branch (normally §main§) and starting commit. Do not silently use the current branch, a detached HEAD, or an outdated remote as the base. If the correct base is ambiguous or missing, ask. Do not fetch/pull/rebase the live checkout without authorization.
-4. Create a unique §garden/<timestamp-or-run-id>§ branch **from the verified base commit** using §git worktree add -b <branch> <new-worktree-path> <base>§. Place the new worktree **outside the live repository and BM project**, with a unique path. Do not switch the live checkout's branch. Resolve the BM project's relative path under the new worktree; **that mirrored directory is the only writable corpus** for this run.
-5. Identify corpus conventions, installed BM version, and supported read-only tools. Locate the bundled §scripts/Find-GardenCandidates.ps1§ under this skill's **installed** directory. Run it against the **worktree's BM root**, not the live BM root.
+1. Resolve the registered BM project's **actual local root**. Verify it exists, determine the containing Git repository root with `git rev-parse --show-toplevel`, and confirm `git rev-parse --is-inside-work-tree` is true. A project may occupy only a subdirectory of a larger repository: preserve that relative path when constructing the gardening worktree. If the BM project cannot be mapped to tracked committed files, stop; untracked/ignored corpus files would not be present in the worktree.
+2. **Before creating a gardening branch, check the *entire* live repository** with `git status --porcelain=v1 --untracked-files=all` at the Git root, **not just the selected BM folder**. If any tracked changes or untracked files are present, **stop and ask the user to commit or otherwise resolve them**. Do not automatically commit, stash, reset, clean, or discard. Ignored files are not part of Git's committed snapshot; verify no required BM corpus notes are ignored. The live capture writer may make the tree dirty at any time; this is a preflight requirement, **not** a reason to block on later live changes after the worktree has been created.
+3. Verify the intended base branch (normally `main`) and starting commit. Do not silently use the current branch, a detached HEAD, or an outdated remote as the base. If the correct base is ambiguous or missing, ask. Do not fetch/pull/rebase the live checkout without authorization.
+4. Create a unique `garden/<timestamp-or-run-id>` branch **from the verified base commit** using `git worktree add -b <branch> <new-worktree-path> <base>`. Place the new worktree **outside the live repository and BM project**, with a unique path. Do not switch the live checkout's branch. Resolve the BM project's relative path under the new worktree; **that mirrored directory is the only writable corpus** for this run.
+5. Identify corpus conventions, installed BM version, and supported read-only tools. Locate the bundled `scripts/Find-GardenCandidates.ps1` under this skill's **installed** directory. Run it against the **worktree's BM root**, not the live BM root.
 6. Keep the worktree branch and commits available for review. A local Git repository without a GitHub remote still supports branch/diff review; **do not require GitHub connectivity** merely to garden. GitHub PR creation and push are optional, user-approved operations.
 
 Illustrative commands (resolve real paths, project-relative directory, branch names, and base; **never copy example paths blindly**):
@@ -76,9 +76,9 @@ git -C $liveRepo worktree add -b $branch $gardenWorktree main
 
 **Worktree/BM MCP boundary (critical):**
 
-- **Never use §edit_note§, §write_note§, §move_note§, or other mutating BM MCP/CLI calls on the registered live BM project during gardening.** Those tools generally target the live project's configured path, **not** the Git worktree.
-- Edit Markdown/frontmatter **directly inside the gardening worktree** with ordinary local file tools. Keep the original note syntax, identity, provenance, and links; use §git diff§ and direct file reads to verify. Do not register or reconfigure the live BM project to point to the worktree.
-- Read-only BM search, §read_note§, and §build_context§ may help **discover** candidate notes, but their index can reflect live captures made **after** the gardening branch was created. Treat such results as hints and **recheck all decisive evidence in the worktree snapshot**. Do not pretend a live BM search validates unmerged worktree edits.
+- **Never use `edit_note`, `write_note`, `move_note`, or other mutating BM MCP/CLI calls on the registered live BM project during gardening.** Those tools generally target the live project's configured path, **not** the Git worktree.
+- Edit Markdown/frontmatter **directly inside the gardening worktree** with ordinary local file tools. Keep the original note syntax, identity, provenance, and links; use `git diff` and direct file reads to verify. Do not register or reconfigure the live BM project to point to the worktree.
+- Read-only BM search, `read_note`, and `build_context` may help **discover** candidate notes, but their index can reflect live captures made **after** the gardening branch was created. Treat such results as hints and **recheck all decisive evidence in the worktree snapshot**. Do not pretend a live BM search validates unmerged worktree edits.
 - Once the branch is merged and the live checkout safely updated, let BM sync/reindex through its supported mechanism and verify retrieval and graph integrity then. Do not change capture extension behavior.
 
 ## 4. Discover and prioritize work
@@ -101,7 +101,7 @@ $inventoryScript = Join-Path $skillDir 'scripts\Find-GardenCandidates.ps1'
 
 Pass the **mirrored BM project root inside the gardening worktree** as `-Root`, and the optional requested relative subtree as `-Folder`; omit `-Folder` for a whole-project run. Never run a candidate inventory against the live checkout and then edit those paths. The default output lists Markdown notes missing a watermark or modified since it; `-IncludeUnchanged` also lists previously reviewed, unchanged notes. Each row contains the relative path, size, mtime, watermark, archive flag, and candidate reason. **Use this output to decide which notes to investigate**, then use BM search/read/graph tools for substantive analysis. A script candidate is not proof of stale knowledge, and an unchanged note may still be relevant when linked evidence changes.
 
-If the project is cloud-only or not Git-backed, **fail fast** under §3. If PowerShell or the installed script is unavailable but the Git worktree exists, report the limitation and use read-only **worktree filesystem** inventory instead. Do not silently assume the script ran or change PowerShell execution policy solely to run it.
+If the project is cloud-only or not Git-backed, **fail fast** under `3. If PowerShell or the installed script is unavailable but the Git worktree exists, report the limitation and use read-only **worktree filesystem** inventory instead. Do not silently assume the script ran or change PowerShell execution policy solely to run it.
 
 Discover files under the authorized folder, not just those returned by search. Record for each **candidate**:
 
@@ -131,7 +131,7 @@ Do not rank by age alone. An old decision may remain current; a newly modified n
 Use the **per-note frontmatter timestamp `last_gardened_at`** as the only persistent watermark. No external manifest, private database, content hashes, processing queue, or deterministic gardening engine. The timestamp records a **successfully completed gardening review**, not a claim that every fact is verified.
 
 1. Compare each note's filesystem **last modified time** to `last_gardened_at`. If absent, it is eligible for first review. If mtime is meaningfully newer, it is eligible again; otherwise ordinarily skip substantive LLM re-review.
-2. **Use the bundled `scripts/Find-GardenCandidates.ps1` at the beginning of each local gardening pass**, as shown in §4.1, to identify missing/expired watermarks and size signals without loading full bodies. The LLM decides what, if anything, should change. If the script is unavailable, report the fallback used. No resource budgets or candidate caps are imposed.
+2. **Use the bundled `scripts/Find-GardenCandidates.ps1` at the beginning of each local gardening pass**, as shown in `4.1, to identify missing/expired watermarks and size signals without loading full bodies. The LLM decides what, if anything, should change. If the script is unavailable, report the fallback used. No resource budgets or candidate caps are imposed.
 3. Consider directly related notes when changed evidence implies a contradiction, supersession, broken link, or affected canonical conclusion, even if those neighbors are unchanged. An explicit deep/force request may revisit unchanged notes.
 4. During the default gardening run, after a non-live note has been reviewed and its worktree edits verified, write `last_gardened_at` **in the worktree** using the actual offset-aware ISO 8601 time. A pending/failed note must **not** receive a successful watermark. An explicitly requested read-only inspection never writes watermarks.
 5. A watermark-only frontmatter update itself advances file mtime. Treat the small mtime difference from that write as *the same gardening event* (the helper uses a few seconds' tolerance). This is approximate: a near-simultaneous external edit could be missed. Recheck before consequential writes and force review when in doubt.
@@ -303,9 +303,9 @@ BM does not support a single metadata predicate meaning “missing or false” w
 For each candidate, decide the **minimum useful action**: no-op, verify, promote, update, split, consolidate, link, annotate, or archive. Make the substantive changes directly in the **isolated worktree** by default. Do not pause for an upfront audit/plan approval unless a specific ambiguous decision or scope expansion requires it.
 
 1. Read the exact **worktree** target and source evidence before editing; verify project/folder write scope and protect immutable originals and potentially live checkpoint paths.
-2. Edit only the worktree files. Preserve Markdown/YAML formatting, source provenance, stable §thread_id§ and link identities. Do **not** use mutating BM MCP calls against the live registered project. No broad rewrites without a concrete retrieval/knowledge benefit.
-3. Stamp §last_gardened_at§ on eligible successfully reviewed authored notes **in the worktree** after their changes are verified. Never stamp a failed review, an immutable source, or a potentially live checkpoint merely to mark it processed.
-4. Inspect the **entire gardening worktree** status and diff before committing. Confirm all changed paths are within the authorized BM project/folder and that no original evidence or note was deleted. Stage **explicit approved paths**, not §git add -A§ at the repository root; reject accidental changes. Use an ordinary local Git commit on the gardening branch.
+2. Edit only the worktree files. Preserve Markdown/YAML formatting, source provenance, stable `thread_id` and link identities. Do **not** use mutating BM MCP calls against the live registered project. No broad rewrites without a concrete retrieval/knowledge benefit.
+3. Stamp `last_gardened_at` on eligible successfully reviewed authored notes **in the worktree** after their changes are verified. Never stamp a failed review, an immutable source, or a potentially live checkpoint merely to mark it processed.
+4. Inspect the **entire gardening worktree** status and diff before committing. Confirm all changed paths are within the authorized BM project/folder and that no original evidence or note was deleted. Stage **explicit approved paths**, not `git add -A` at the repository root; reject accidental changes. Use an ordinary local Git commit on the gardening branch.
 5. Present a concise summary of the branch, base commit, gardening commit(s), changed files, substantive findings, unresolved questions, and how to inspect the diff. If there are no meaningful changes, report a no-op rather than fabricating a commit.
 6. Offer the user **local diff review** or, **if the repository has an appropriate GitHub remote and the user agrees to push**, a PR. Never automatically publish private corpus contents, push, or create a PR merely because a remote exists. If a PR is requested, push **only the gardening branch** to the intended remote and create the PR against the verified base branch. Provide its link and await approval.
 7. **Never merge until the user explicitly approves the reviewed changes.** Approval may follow a local diff or a PR. If the branch changed since review, show the new diff and ask for renewed approval. Respect branch protection, required checks, and reviewers; do not bypass them. If the base branch advanced, validate/reconcile against its new state; do not force-push or silently overwrite conflicts.
@@ -319,11 +319,11 @@ The gardener edits the **Git worktree copy of the BM corpus**, not the Copilot c
 Before requesting approval, verify **against the gardening worktree**:
 
 - Read back each changed note and confirm expected frontmatter, content, original provenance, and stable identifiers.
-- Verify relative links and relation targets against worktree files; compare before/after graph edges and source pointers. A live BM §build_context§ call does **not** validate the unmerged worktree.
+- Verify relative links and relation targets against worktree files; compare before/after graph edges and source pointers. A live BM `build_context` call does **not** validate the unmerged worktree.
 - For split/consolidation, compare original evidence against the derived notes; verify no unique decision, exception, rationale, or source link was lost.
-- For archive, confirm §archived: true§, §superseded_by§ where appropriate, and historical note identity remain intact. New/current notes should not accidentally carry §archived: true§.
-- Verify §last_gardened_at§ was stamped only on eligible, successfully reviewed authored notes.
-- Inspect §git diff --check§ and the complete changed-path list; verify **no unintended deletion, out-of-scope file, or broad rewrite**. Check §git status§ after the gardening commit.
+- For archive, confirm `archived: true`, `superseded_by` where appropriate, and historical note identity remain intact. New/current notes should not accidentally carry `archived: true`.
+- Verify `last_gardened_at` was stamped only on eligible, successfully reviewed authored notes.
+- Inspect `git diff --check` and the complete changed-path list; verify **no unintended deletion, out-of-scope file, or broad rewrite**. Check `git status` after the gardening commit.
 - Test representative retrieval questions **conceptually from worktree content**. Do not claim BM has indexed unmerged edits.
 
 **After approved merge and safe local sync**, use the installed BM's supported indexing/sync path and verify actual search results, archive-aware interpretation, and graph navigation. If sync/index verification is not yet possible, state that explicitly; do not report it as completed.
