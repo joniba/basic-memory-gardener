@@ -88,9 +88,9 @@ git -C $liveRepo worktree add -b $branch $gardenWorktree main
 **Run the bundled inventory script against the isolated worktree's BM project directory**, not the live project. This is the standard candidate-discovery step, not a separate service or an optional manual prerequisite. It is read-only and does not call an LLM. Use the installed skill directory as the script base path, not the repository root or Copilot's current working directory.
 
 ```powershell
-# Illustrative user-level Copilot skill installation; resolve the actual
-# installed skill directory if yours differs.
-$skillDir = Join-Path $HOME '.copilot\skills\memory-garden'
+# Resolve the actual installed directory containing this SKILL.md.
+# With a Copilot plugin this is under the installed plugin, NOT necessarily $HOME\.copilot\skills.
+$skillDir = '<absolute installed memory-garden skill directory>'
 $inventoryScript = Join-Path $skillDir 'scripts\Find-GardenCandidates.ps1'
 # $gardenBMRoot = the mirrored BM project directory in the new Git worktree
 & $inventoryScript -Root $gardenBMRoot -Folder 'engineering'
