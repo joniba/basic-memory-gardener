@@ -1,8 +1,8 @@
 # Basic Memory Gardener
 
-A single, **LLM-driven maintenance skill** for a **Git-backed** [Basic Memory](https://github.com/basicmachines-co/basic-memory) knowledge corpus. It improves existing notes by consolidating session findings, splitting unwieldy authored notes, curating relationships, checking freshness and provenance, and preserving historical knowledge. All edits happen in an isolated Git worktree and are merged only after review/approval.
+A single, **LLM-driven maintenance skill** for a [Basic Memory](https://github.com/basicmachines-co/basic-memory) knowledge corpus. It improves the usefulness of existing notes by consolidating session findings, splitting unwieldy authored notes, curating relationships, checking freshness and provenance, and preserving historical knowledge.
 
-**Current phase: Git-only, worktree-isolated LLM gardening with a bundled read-only discovery script.** No service, database, external state manifest, hashing pipeline, resource budgets, or scheduling framework. The agent reviews the committed worktree snapshot; its PowerShell helper finds notes changed since their per-note `last_gardened_at` timestamp.
+**Current phase: BM-native, LLM-driven gardening with a bundled read-only discovery script.** The gardener uses the registered Basic Memory project's MCP search, graph, and note-editing capabilities, not a separate Git worktree, duplicate project index, or filesystem-only editing engine. No service, database, external state manifest, hashing pipeline, resource budgets, or scheduling framework. For local broad passes, the script compares canonical note frontmatter `modified` with `last_gardened_at`, without using filesystem or Git modification times.
 
 ## Start here
 
@@ -10,11 +10,11 @@ A single, **LLM-driven maintenance skill** for a **Git-backed** [Basic Memory](h
 - **[Customized memory-capture skill](skills/memory-capture/SKILL.md)** — upstream capture behavior with safeguards against silently reactivating archived checkpoints; ordinary notes omit `archived`.
 - **[Global Copilot retrieval instructions](snippets/copilot-global-instructions.md)** — a copy-ready, always-on section for searches, bounded reads, graph navigation, freshness, and archive-aware answers.
 - **[Related community work and archiving notes](docs/ecosystem-and-archiving.md)** — projects, upstream behavior, and limitations.
-- **[Bundled candidate inventory script](skills/memory-garden/scripts/Find-GardenCandidates.ps1)** — shipped and installed with the gardener skill; lists notes without a gardening watermark or modified since their last review, with no private state file.
+- **[Bundled candidate inventory script](skills/memory-garden/scripts/Find-GardenCandidates.ps1)** — shipped with the skill; reads explicit canonical `modified` and `last_gardened_at` from frontmatter without a private state file or filesystem/Git timestamp comparison.
 
 ### Install the GitHub Copilot CLI plugin
 
-Prerequisites: a **local Git-backed Basic Memory corpus**, Git worktree support, a working Basic Memory MCP connection for read-only discovery, PowerShell for the bundled inventory helper, and a Copilot CLI
+Prerequisites: a working local Basic Memory MCP connection and a Copilot CLI
 build supporting Agent Plugins 1.0. The root `plugin.json` packages both
 `memory-garden` and the archive-aware `memory-capture` from `skills/`, including
 the gardener's inventory helper. No hooks, MCP server, extension, service,
@@ -69,38 +69,35 @@ gardener itself protects live checkpoints regardless of which capture copy is
 active. Do not change the bridge extension, thresholds, or timers to resolve a
 skill-precedence issue.
 
-**Retrieval:** unmarked notes are unarchived. Ordinary searches have no archive metadata filter and exclude any `archived: true` hits from current answers. Searching specifically for archived notes is reserved for explicit historical requests and internal gardening. The bundled PowerShell helper reads `last_gardened_at` from note frontmatter; no external state is maintained.
+**Retrieval:** unmarked notes are unarchived. Ordinary searches have no archive metadata filter and exclude any `archived: true` hits from current answers. Searching specifically for archived notes is reserved for explicit historical requests and internal gardening. The bundled PowerShell helper reads `modified` and `last_gardened_at` from note frontmatter; no external state is maintained.
 
 For consistent **ordinary memory retrieval** across all Copilot sessions, copy the section in [`snippets/copilot-global-instructions.md`](snippets/copilot-global-instructions.md) into your existing user-level/global Copilot instructions. Keep that section always-on and concise; the larger `memory-garden` skill is loaded only for explicit maintenance work. The snippet uses the same canonical-vs-source and `archived: true` conventions as the gardener. It is not automatically installed by the plugin.
 
-### Default gardening workflow
+### Find candidates without model calls
 
-1. **Fail fast** unless the BM project is inside a local Git repository with committed, tracked corpus files. Inspect `git status --porcelain=v1 --untracked-files=all` for the **entire repository**, even when gardening one folder. If dirty, stop and ask the user to commit or resolve it; never auto-commit/stash/reset.
-2. Create a **new Git worktree and `garden/...` branch** from the verified main/base branch, outside the live BM checkout. Do not switch branches in the live checkout.
-3. Run the **bundled inventory script against the worktree BM directory**, then garden the worktree files. BM MCP search may help with discovery, but **all writes must use local file tools on the worktree**; BM MCP write tools still point to the live project and must not be used.
-4. Verify changed paths, note links, provenance, and diff; commit only authorized corpus paths on the gardening branch.
-5. Show the diff/summary for approval. The user can review locally or authorize pushing a branch and opening a GitHub PR. **No automatic push, PR, or merge.**
-6. **After explicit approval**, merge safely. A GitHub PR can merge remotely without touching the live checkout. The local BM checkout must be synchronized **only when safe from concurrent captures**; then BM can reindex and verify the changes. For local-only Git, wait for a clean checkout and safe merge window.
+For a broad local pass, resolve the installed plugin skill directory and run its bundled helper against the **registered BM project root**:
 
-The initial clean-state check happens **before** creating the worktree. Captures may continue modifying the live checkout **afterward** without contaminating gardening commits. The worktree contains the committed snapshot, not later live captures.
+```powershell
+$skillDir = '<absolute installed memory-garden skill directory>'
+& (Join-Path $skillDir 'scripts\Find-GardenCandidates.ps1') -Root 'C:\path\to\bm-project' -Folder 'engineering'
+```
 
-### Bundled candidate inventory
+The helper reads only top-level frontmatter `modified`, `last_gardened_at`, and `archived` plus file sizes/paths. A note is normally skippable when both timestamps are valid, explicit and offset-aware, and `modified <= last_gardened_at`. Missing or ambiguous `modified` is **unknown**, not unchanged; it remains eligible. BM exposes canonical frontmatter `modified` as indexed `updated_at`, but for notes lacking explicit `modified` it may fall back to filesystem mtime. The gardener does **not** use that fallback to certify a note as unchanged.
 
-The gardener automatically invokes its installed `scripts/Find-GardenCandidates.ps1` against the **worktree's BM project root** when PowerShell is available. For manual testing, locate the actual installed plugin's skill directory using `copilot skill list --json`, then run:
+Use `-IncludeUnchanged` for a full inventory. For targeted work, BM compact search/recent activity may be cheaper than a broad scan. If the script cannot run, the gardener falls back to BM directory/search/metadata tools. It never stamps live session checkpoints or immutable source documents just to record review.
 
-~~~powershell
-$skillDir = '<actual installed plugin>/skills/memory-garden'
-& (Join-Path $skillDir 'scripts/Find-GardenCandidates.ps1') -Root '<BM project directory inside gardening worktree>' -Folder 'engineering'
-~~~
+### BM-native operations and safe edits
 
-The helper returns notes with missing/outdated `last_gardened_at`, plus size and archive status. Use `-IncludeUnchanged` for a complete inventory. It never edits files or makes semantic gardening decisions. **New Git worktrees refresh filesystem mtimes**, so the helper instead compares `last_gardened_at` to each note's **last committed Git modification time**. It tolerates a small gap between stamping and committing the gardening changes; this is intentionally approximate. The gardener never stamps potentially live session checkpoints or immutable sources merely to mark them processed.
+The gardener uses `search_notes(compact=True)`, paged `list_directory` and `recent_activity` for discovery, `read_note(include_content=False)` for cheap identity/checksum checks, bounded `read_note(start_line, end_line)` for selected evidence, and `build_context(compact=True, depth=1)` for relevant relations. It uses guarded `edit_note`/`write_note` for changes, avoiding full note reads and rewrites unless the task genuinely requires them.
+
+All writes target the **already registered BM project**. The skill does not create Git worktrees, register a second BM project, or trigger a duplicate full-corpus index. A first run defaults to read-only planning. For apply, coordinate with concurrent session capture (ideally a maintenance window), use revision checks, verify BM indexing, and inspect a private Git diff when available. No automatic branch switching, Git commit, merge, or change to the capture bridge.
 
 ### Example requests
 
-- "Garden Basic Memory project **main**. Prepare a reviewable gardening branch and show me the diff."
-- "Garden Basic Memory project **main**, limited to **personal/sessions/**. Show what reusable knowledge you found; ask before expanding write scope."
+- "Use memory-garden to audit Basic Memory project **main**. Preview improvements only."
+- "Garden Basic Memory project **main**, limited to **personal/sessions/**. Promote durable findings into the existing project only after I approve the plan."
 - "Use memory-garden on project **engineering**, folder **investigations/**. Review contradictions, oversized notes, duplicate findings, relationships, and archival candidates."
-- "Open a GitHub PR for the completed gardening branch in project **main** so I can review it."
+- "Apply the previously approved gardening changes to project **main** and verify search, provenance, and links."
 
 Project/folder names are examples, not defaults. **Specify the target BM project**, and optionally a path within that project. A folder scope constrains *writes*; the skill may inspect relevant neighboring notes read-only for context.
 
@@ -111,10 +108,10 @@ Project/folder names are examples, not defaults. **Specify the target BM project
 3. **Do not disrupt live session capture.** The separate [Copilot bridge](https://github.com/joniba/basic-memory-copilot-bridge) remains responsible for checkpointing.
 4. **Archive in place initially.** Only genuine historical/superseded notes get `archived: true`; absence of the field means not archived. Do not move notes just to archive them. This is a *convention*, not a native default search exclusion.
 5. **Promote durable knowledge without copying entire sources.** Preserve author, source dates, and source pointers.
-6. **Git-only, worktree-isolated, reviewable changes.** Fail fast without Git or a clean committed baseline. Never merge before approval; verify BM indexing after safe local sync.
+6. **Reviewable changes, evidence-based edits, and verification.** Prefer a preview on the first run.
 
 ## Scope of this repository
 
 This is the gardener's home. It is **not** the Basic Memory corpus. Do not commit private memory notes, source documents, credentials, or run logs into this public repository. The read-only candidate inventory script is bundled inside the `memory-garden` skill; it never modifies the Basic Memory corpus. Further automation is optional.
 
-The earlier [bridge integration proposal](https://github.com/joniba/basic-memory-copilot-bridge/issues/2) remains useful background, but its hash-based manifest, queue, budgets, and scheduling pipeline are **not part of this simpler skill**. Instead, the per-note `last_gardened_at` watermark, bundled script, and Git worktree review provide lightweight incremental discovery and safe isolation.
+The earlier [bridge integration proposal](https://github.com/joniba/basic-memory-copilot-bridge/issues/2) remains useful background, but its hash-based manifest, queue, budgets, and scheduling pipeline are **not part of this simpler skill**. Instead, the per-note `last_gardened_at` watermark and bundled skill script provide lightweight incremental discovery.
