@@ -1,6 +1,6 @@
 # Related work, archiving, and first-phase decisions
 
-Research notes for the **Git-only, worktree-isolated LLM-first skill with bundled lightweight scripts** version of Basic Memory Gardener (October 2026). These are design references, not dependencies. Check the installed Basic Memory version before assuming a specific tool signature.
+Research notes for the **BM-native, LLM-first skill with a lightweight read-only inventory helper** version of Basic Memory Gardener (October 2026). These are design references, not dependencies. Check the installed Basic Memory version before assuming a specific tool signature.
 
 ## Existing efforts
 
@@ -41,9 +41,9 @@ knowledge_status: superseded
 
 **Ordinary retrieval:** search without an archive equality filter, then exclude `archived: true` hits from current answers. `metadata_filters={"archived": False}` would hide normal unmarked notes. Explicit archived:true searches are **discouraged except when the user specifically requests historical information, old-vs-new comparison, or another historical perspective**. The gardener's own internal maintenance review is a separate exception. If archived notes dominate results, use alternate queries/pagination or combine separate missing-field and explicit-false searches; don't silently fall back to archived notes as current authority.
 
-**Lightweight incremental review:** the gardener stamps editable, successfully reviewed authored notes with `last_gardened_at`. Because a fresh Git worktree gives files new filesystem mtimes, the [bundled PowerShell script](../skills/memory-garden/scripts/Find-GardenCandidates.ps1) instead compares that watermark with each note's **last committed Git modification time**, using a small tolerance for the gardening commit itself. There is no hash manifest or private database. Live checkpoints and immutable source documents are not stamped without special authorization. This is deliberately approximate.
+**Lightweight incremental review:** Basic Memory's canonical note timestamp is top-level YAML frontmatter `modified`, projected as indexed `updated_at`. For legacy notes without explicit `modified`, BM may derive `updated_at` from filesystem mtime; the indexed value alone does not prove the note carries a canonical timestamp ([BM domain model](https://github.com/basicmachines-co/basic-memory/blob/main/docs/DOMAIN_MODEL.md)). The gardener compares **explicit, valid, offset-aware `modified`** with its own `last_gardened_at` watermark, not filesystem mtime or Git commit dates. Missing/invalid canonical timestamps remain eligible; do not invent historic timestamps to make notes skippable. The [bundled PowerShell script](../skills/memory-garden/scripts/Find-GardenCandidates.ps1) reads only frontmatter and file sizes/paths for local broad inventories; no hash manifest or private database. Live checkpoints and immutable source documents are not stamped without special authorization. Writers should maintain `modified` for substantive changes if they want reliable incremental skipping.
 
-This is the **lowest-risk identity/relationship policy**: metadata changes without moves leave paths and link targets stable. All gardening edits happen in a separate Git worktree/branch, not the registered live BM checkout. Verify worktree files and links before approval; verify **BM indexing and graph only after approved merge and safe local sync**. Archive state is not automatically propagated to graph expansion.
+This is the **lowest-risk identity/relationship policy**: metadata changes without moves leave paths and link targets stable. Gardening uses the **already registered BM project's** MCP read/search/graph/edit operations, not a second project or worktree; verify BM indexing and graph after edits. Archive state is not automatically propagated to graph expansion. Coordinate apply with any concurrent capture writer; BM revision preconditions protect individual edits but do not make a multi-note pass atomic.
 
 ### Why not a sibling archive project now?
 
@@ -65,12 +65,24 @@ Use temporary non-sensitive notes or a safe existing fixture, not production-wid
 6. Change archived metadata via a supported BM edit operation; verify permalink, incoming/outgoing relations, and search remain intact.
 7. Check whether an archived note outranks a current note for a representative query; if so, evaluate a client-side retrieval rule or future native search filter.
 8. Confirm folder-scoped gardening never edits notes outside the authorized subtree, even when the search index returns them.
-9. Confirm a successfully stamped, unchanged authored note is skipped by the **Git commit-time** inventory helper even in a fresh worktree; a later committed substantive edit makes it eligible. Verify the small stamp-to-commit tolerance.
+9. Confirm a successfully stamped, unchanged authored note with explicit canonical `modified` is skipped by the helper; a later substantive edit that advances `modified` makes it eligible. No filesystem/Git timestamp or post-stamp tolerance is used.
 10. Confirm the gardener never stamps an active checkpoint merely to record a review.
-11. Confirm non-Git projects and dirty repositories (including changes outside the requested folder) fail fast, without committing or stashing.
-12. Confirm live capture continues modifying the original checkout while gardening changes remain isolated in a different Git worktree.
-13. Confirm BM MCP write tools are never used against the live project during gardening, and unmerged worktree edits are not falsely described as indexed.
-14. Confirm PR publication and merge require approval; after remote merge, the local checkout is only synced when safe from concurrent capture writes.
+11. Confirm a note missing explicit `modified` remains eligible even if BM indexed `updated_at` is present (it may be an mtime fallback); invalid/naive timestamps are not silently assumed comparable.
+12. Confirm compact `search_notes` and compact `build_context` omit note bodies, `read_note(include_content=False)` provides identity/checksum without body, and bounded `read_note` reads just the required lines.
+13. Confirm guarded BM `edit_note` refuses a stale `expected_checksum` and a successful change becomes searchable/linked after indexing catches up.
+14. Confirm no Git worktree, duplicate BM project/index, branch switch, or automatic Git commit is created by the gardener.
+
+## BM-native retrieval and mutation cost
+
+For gardening, **discover before loading note bodies**:
+
+- `search_notes(compact=True, page_size=...)` returns identities, metadata, relations, scores, and pagination without content/matched chunks; use text/title/permalink search for exact anchors and hybrid/vector only for conceptual discovery when enabled.
+- `list_directory` and `recent_activity` provide paged orientation. For a local broad inventory, the bundled PowerShell helper reads top-level frontmatter rather than all note bodies.
+- `read_note(include_content=False, output_format="json")` returns the note's title, permalink, path, full checksum, and indexed `updated_at`, **not** its complete frontmatter. Use a small `read_note(start_line=1, end_line=...)` to confirm explicit `modified`, and bounded ranges or `bm grep` for targeted evidence.
+- `build_context(depth=1, compact=True, max_related=...)` explores the relevant graph neighborhood without loading note bodies or observation lists.
+- `edit_note` supports targeted section/phrase edits, merged frontmatter metadata, and `expected_checksum` for revision-safe updates. Use `write_note` for new notes or necessary whole-note rewrites; verify readback and index/relations.
+
+These optimizations reduce **LLM context volume**, not necessarily the number of server-side operations. Do not issue extra searches/reads if a modest single read would be cheaper. Use the installed BM version's actual tool schema.
 
 ## Deliberately deferred
 
@@ -90,7 +102,7 @@ After several real gardening passes, judge:
 - Did it reduce the need to read large notes, without losing context?
 - Did it preserve historical facts and avoid duplicate canonical accounts?
 - Were the LLM token costs and review burden tolerable?
-- Does the bundled Git-history-based timestamp inventory script meaningfully reduce unnecessary repeat review?
+- Does the canonical-frontmatter timestamp inventory script meaningfully reduce unnecessary repeat review without misclassifying missing timestamps?
 - Which repeated mistakes, if any, justify additional scripting without introducing a new state system?
 
 Only build a service/pipeline for problems demonstrated by these trials.
