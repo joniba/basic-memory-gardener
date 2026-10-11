@@ -7,9 +7,9 @@
   Missing archived means NOT archived. Archived notes may be listed for gardening.
   Never edits files. Reads only frontmatter, not full Markdown bodies.
 .EXAMPLE
-  .\scripts\Find-GardenCandidates.ps1 -Root 'C:\basic-memory\main'
+  & "$HOME\.copilot\skills\memory-garden\scripts\Find-GardenCandidates.ps1" -Root 'C:\basic-memory\main'
 .EXAMPLE
-  .\scripts\Find-GardenCandidates.ps1 -Root 'C:\basic-memory\main' -Folder 'engineering' |
+  & "$HOME\.copilot\skills\memory-garden\scripts\Find-GardenCandidates.ps1" -Root 'C:\basic-memory\main' -Folder 'engineering' |
     Format-Table -AutoSize
 #>
 [CmdletBinding()]
