@@ -1,6 +1,6 @@
 # Related work, archiving, and first-phase decisions
 
-Research notes for the **LLM-first skill with optional lightweight scripts** version of Basic Memory Gardener (October 2026). These are design references, not dependencies. Check the installed Basic Memory version before assuming a specific tool signature.
+Research notes for the **Git-only, worktree-isolated LLM-first skill with bundled lightweight scripts** version of Basic Memory Gardener (October 2026). These are design references, not dependencies. Check the installed Basic Memory version before assuming a specific tool signature.
 
 ## Existing efforts
 
@@ -41,9 +41,9 @@ knowledge_status: superseded
 
 **Ordinary retrieval:** search without an archive equality filter, then exclude `archived: true` hits from current answers. `metadata_filters={"archived": False}` would hide normal unmarked notes. Explicit archived:true searches are **discouraged except when the user specifically requests historical information, old-vs-new comparison, or another historical perspective**. The gardener's own internal maintenance review is a separate exception. If archived notes dominate results, use alternate queries/pagination or combine separate missing-field and explicit-false searches; don't silently fall back to archived notes as current authority.
 
-**Lightweight incremental review:** the gardener may stamp editable, successfully reviewed notes with `last_gardened_at` and compare that value with filesystem mtime on later runs. The [bundled PowerShell script](../skills/memory-garden/scripts/Find-GardenCandidates.ps1) inventories candidates and is invoked by the gardener skill on locally accessible BM projects; there is no hash manifest or private database. Live checkpoints and immutable source documents are not stamped without special authorization. This is deliberately approximate and may re-review such notes.
+**Lightweight incremental review:** the gardener stamps editable, successfully reviewed authored notes with `last_gardened_at`. Because a fresh Git worktree gives files new filesystem mtimes, the [bundled PowerShell script](../skills/memory-garden/scripts/Find-GardenCandidates.ps1) instead compares that watermark with each note's **last committed Git modification time**, using a small tolerance for the gardening commit itself. There is no hash manifest or private database. Live checkpoints and immutable source documents are not stamped without special authorization. This is deliberately approximate.
 
-This is the **lowest-risk identity/relationship policy**: metadata changes without moves leave paths and link targets stable. Verify BM indexing and graph after edits; archive state is not automatically propagated to graph expansion.
+This is the **lowest-risk identity/relationship policy**: metadata changes without moves leave paths and link targets stable. All gardening edits happen in a separate Git worktree/branch, not the registered live BM checkout. Verify worktree files and links before approval; verify **BM indexing and graph only after approved merge and safe local sync**. Archive state is not automatically propagated to graph expansion.
 
 ### Why not a sibling archive project now?
 
@@ -65,8 +65,12 @@ Use temporary non-sensitive notes or a safe existing fixture, not production-wid
 6. Change archived metadata via a supported BM edit operation; verify permalink, incoming/outgoing relations, and search remain intact.
 7. Check whether an archived note outranks a current note for a representative query; if so, evaluate a client-side retrieval rule or future native search filter.
 8. Confirm folder-scoped gardening never edits notes outside the authorized subtree, even when the search index returns them.
-9. Confirm a successfully stamped, unchanged authored note is skipped by the timestamp inventory helper; a later substantive edit makes it eligible. Verify the small post-stamp mtime tolerance.
+9. Confirm a successfully stamped, unchanged authored note is skipped by the **Git commit-time** inventory helper even in a fresh worktree; a later committed substantive edit makes it eligible. Verify the small stamp-to-commit tolerance.
 10. Confirm the gardener never stamps an active checkpoint merely to record a review.
+11. Confirm non-Git projects and dirty repositories (including changes outside the requested folder) fail fast, without committing or stashing.
+12. Confirm live capture continues modifying the original checkout while gardening changes remain isolated in a different Git worktree.
+13. Confirm BM MCP write tools are never used against the live project during gardening, and unmerged worktree edits are not falsely described as indexed.
+14. Confirm PR publication and merge require approval; after remote merge, the local checkout is only synced when safe from concurrent capture writes.
 
 ## Deliberately deferred
 
@@ -86,7 +90,7 @@ After several real gardening passes, judge:
 - Did it reduce the need to read large notes, without losing context?
 - Did it preserve historical facts and avoid duplicate canonical accounts?
 - Were the LLM token costs and review burden tolerable?
-- Does the optional timestamp inventory script meaningfully reduce unnecessary repeat review?
+- Does the bundled Git-history-based timestamp inventory script meaningfully reduce unnecessary repeat review?
 - Which repeated mistakes, if any, justify additional scripting without introducing a new state system?
 
 Only build a service/pipeline for problems demonstrated by these trials.
