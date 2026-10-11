@@ -2,7 +2,7 @@
 
 A single, **LLM-driven maintenance skill** for a [Basic Memory](https://github.com/basicmachines-co/basic-memory) knowledge corpus. It improves the usefulness of existing notes by consolidating session findings, splitting unwieldy authored notes, curating relationships, checking freshness and provenance, and preserving historical knowledge.
 
-**Current phase: LLM-driven gardening with optional lightweight scripts.** No service, database, external state manifest, hashing pipeline, resource budgets, or scheduling framework. The agent performs the substantive review; a read-only PowerShell helper can cheaply find notes changed since their per-note `last_gardened_at` timestamp.
+**Current phase: LLM-driven gardening with a bundled read-only discovery script.** No service, database, external state manifest, hashing pipeline, resource budgets, or scheduling framework. The agent performs the substantive review; the skill instructs it to run its included PowerShell inventory script on locally accessible BM projects to find notes changed since their per-note `last_gardened_at` timestamp.
 
 ## Start here
 
@@ -10,19 +10,20 @@ A single, **LLM-driven maintenance skill** for a [Basic Memory](https://github.c
 - **[Customized memory-capture skill](skills/memory-capture/SKILL.md)** — upstream capture behavior with safeguards against silently reactivating archived checkpoints; ordinary notes omit `archived`.
 - **[Global Copilot retrieval instructions](snippets/copilot-global-instructions.md)** — a copy-ready, always-on section for searches, bounded reads, graph navigation, freshness, and archive-aware answers.
 - **[Related community work and archiving notes](docs/ecosystem-and-archiving.md)** — projects, upstream behavior, and limitations.
-- **[Read-only candidate inventory helper](scripts/Find-GardenCandidates.ps1)** — lists notes without a gardening watermark or modified since their last review; no private state file.
+- **[Bundled candidate inventory script](skills/memory-garden/scripts/Find-GardenCandidates.ps1)** — shipped and installed with the gardener skill; lists notes without a gardening watermark or modified since their last review, with no private state file.
 
 ### Use with GitHub Copilot CLI
 
 Prerequisites: a working local Basic Memory MCP connection and a Copilot CLI installation that discovers SKILL.md skills. On Windows, copy the skill directory to your user skills directory:
 
 ~~~powershell
-New-Item -ItemType Directory -Force "$HOME\.copilot\skills\memory-garden" | Out-Null
-Copy-Item ".\skills\memory-garden\SKILL.md" "$HOME\.copilot\skills\memory-garden\SKILL.md" -Force
+$target = Join-Path $HOME '.copilot\skills\memory-garden'
+New-Item -ItemType Directory -Force $target | Out-Null
+Copy-Item '.\skills\memory-garden\*' $target -Recurse -Force
 copilot skill list --json
 ~~~
 
-Restart or reload Copilot if necessary, and verify that the skill is discovered. Installing this skill does not change the Basic Memory MCP configuration or session capture extension.
+Restart or reload Copilot if necessary, and verify that the skill is discovered **and that `$target\scripts\Find-GardenCandidates.ps1` exists**. Copy the entire skill directory, not just `SKILL.md`; otherwise the agent cannot run the bundled script. Installing this skill does not change the Basic Memory MCP configuration or session capture extension.
 
 ### Use the archive-aware memory-capture skill
 
@@ -43,17 +44,17 @@ copilot skill list --json
 
 If multiple `memory-capture` skills remain discoverable, resolve the duplicate/precedence using your installed Copilot CLI's skill configuration; do **not** assume the customized copy wins. Restart or reload the session and perform a safe test capture: verify the note retains its original `thread_id` and provenance, and that a second capture updates the same note. An ordinary new note should **omit** `archived`. Do not change the bridge extension, its thresholds, or its timers.
 
-**Retrieval:** unmarked notes are unarchived. Ordinary searches have no archive metadata filter and exclude any `archived: true` hits from current answers. Searching specifically for archived notes is reserved for explicit historical requests and internal gardening. The optional PowerShell helper reads `last_gardened_at` from note frontmatter; no external state is maintained.
+**Retrieval:** unmarked notes are unarchived. Ordinary searches have no archive metadata filter and exclude any `archived: true` hits from current answers. Searching specifically for archived notes is reserved for explicit historical requests and internal gardening. The bundled PowerShell helper reads `last_gardened_at` from note frontmatter; no external state is maintained.
 
 For consistent **ordinary memory retrieval** across all Copilot sessions, copy the section in [`snippets/copilot-global-instructions.md`](snippets/copilot-global-instructions.md) into your existing user-level/global Copilot instructions. Keep that section always-on and concise; the larger `memory-garden` skill is loaded only for explicit maintenance work. The snippet uses the same canonical-vs-source and `archived: true` conventions as the gardener. It is not automatically installed by the PowerShell commands above.
 
 ### Find candidates without model calls
 
 ```powershell
-.\scripts\Find-GardenCandidates.ps1 -Root 'C:\path\to\bm-project' -Folder 'engineering'
+& "$HOME\.copilot\skills\memory-garden\scripts\Find-GardenCandidates.ps1" -Root 'C:\path\to\bm-project' -Folder 'engineering'
 ```
 
-The helper returns notes with missing or outdated `last_gardened_at`, plus their size and archive status. It does not make gardening decisions. A watermark-only write advances file mtime, so the helper allows a small tolerance; it is intentionally approximate. The gardener must not stamp potentially live session checkpoints or immutable sources just to mark them processed.
+The **skill runs this helper automatically as its first candidate-discovery step** when the BM project is local and PowerShell is available. It returns notes with missing or outdated `last_gardened_at`, plus their size and archive status; it does not make gardening decisions. Use `-IncludeUnchanged` for a complete inventory. If the script cannot run, the skill reports the limitation and falls back to BM tools. A watermark-only write advances file mtime, so the helper allows a small tolerance; it is intentionally approximate. The gardener must not stamp potentially live session checkpoints or immutable sources just to mark them processed.
 
 ### Example requests
 
@@ -75,6 +76,6 @@ Project/folder names are examples, not defaults. **Specify the target BM project
 
 ## Scope of this repository
 
-This is the gardener's home. It is **not** the Basic Memory corpus. Do not commit private memory notes, source documents, credentials, or run logs into this public repository. The optional read-only candidate inventory script lives here; it never modifies the Basic Memory corpus. Further automation is optional.
+This is the gardener's home. It is **not** the Basic Memory corpus. Do not commit private memory notes, source documents, credentials, or run logs into this public repository. The read-only candidate inventory script is bundled inside the `memory-garden` skill; it never modifies the Basic Memory corpus. Further automation is optional.
 
-The earlier [bridge integration proposal](https://github.com/joniba/basic-memory-copilot-bridge/issues/2) remains useful background, but its hash-based manifest, queue, budgets, and scheduling pipeline are **not part of this simpler skill**. Instead, the per-note `last_gardened_at` watermark and optional script provide lightweight incremental discovery.
+The earlier [bridge integration proposal](https://github.com/joniba/basic-memory-copilot-bridge/issues/2) remains useful background, but its hash-based manifest, queue, budgets, and scheduling pipeline are **not part of this simpler skill**. Instead, the per-note `last_gardened_at` watermark and bundled skill script provide lightweight incremental discovery.
