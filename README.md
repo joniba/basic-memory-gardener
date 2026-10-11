@@ -93,7 +93,7 @@ $skillDir = '<actual installed plugin>/skills/memory-garden'
 & (Join-Path $skillDir 'scripts/Find-GardenCandidates.ps1') -Root '<BM project directory inside gardening worktree>' -Folder 'engineering'
 ~~~
 
-The helper returns notes with missing/outdated `last_gardened_at`, plus size and archive status. Use `-IncludeUnchanged` for a complete inventory. It never edits files or makes semantic gardening decisions. A watermark-only write advances mtime, so the helper allows a small tolerance; it is intentionally approximate. The gardener never stamps potentially live session checkpoints or immutable sources merely to mark them processed.
+The helper returns notes with missing/outdated `last_gardened_at`, plus size and archive status. Use `-IncludeUnchanged` for a complete inventory. It never edits files or makes semantic gardening decisions. **New Git worktrees refresh filesystem mtimes**, so the helper instead compares `last_gardened_at` to each note's **last committed Git modification time**. It tolerates a small gap between stamping and committing the gardening changes; this is intentionally approximate. The gardener never stamps potentially live session checkpoints or immutable sources merely to mark them processed.
 
 ### Example requests
 
