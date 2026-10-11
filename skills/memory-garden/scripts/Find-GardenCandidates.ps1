@@ -8,9 +8,10 @@
   Uses one git log pass; no hashes, manifests, databases, budgets, or LLM calls.
   Missing archived means NOT archived. Never edits files.
 .EXAMPLE
-  & "$HOME\.copilot\skills\memory-garden\scripts\Find-GardenCandidates.ps1" -Root 'C:\garden-worktrees\run\notes'
+  # Run from the installed skill's scripts directory:
+  .\Find-GardenCandidates.ps1 -Root 'C:\garden-worktrees\run\notes'
 .EXAMPLE
-  & "$HOME\.copilot\skills\memory-garden\scripts\Find-GardenCandidates.ps1" -Root 'C:\garden-worktrees\run\notes' -Folder 'engineering' |
+  .\Find-GardenCandidates.ps1 -Root 'C:\garden-worktrees\run\notes' -Folder 'engineering' |
     Format-Table -AutoSize
 #>
 [CmdletBinding()]
