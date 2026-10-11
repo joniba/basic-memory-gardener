@@ -1,0 +1,12 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "basic-memory-gardener",
+  "version": "0.1.0",
+  "description": "Explicit-request corpus gardening and archive-aware thread capture for Basic Memory.",
+  "repository": "https://github.com/joniba/basic-memory-gardener",
+  "keywords": [
+    "basic-memory",
+    "skills",
+    "knowledge-management"
+  ]
+}
