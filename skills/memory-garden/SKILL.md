@@ -7,7 +7,7 @@ description: "Maintain one Basic Memory project or a selected folder within it. 
 
 A **single, end-to-end LLM-driven gardener** for an existing Basic Memory (BM) corpus. Combine the intent of upstream memory-reflect, memory-defrag, memory-curate, memory-lifecycle, memory-notes, and memory-metadata-search in **one pass and one report**. These are conceptual sources, not separate scheduled jobs or required skill invocations.
 
-This first version intentionally uses agent reasoning and ordinary BM/local tools rather than a scanner, service, new database, custom MCP, or elaborate automation. It can consume substantial tokens. The purpose is to establish whether gardening materially improves future retrieval and knowledge quality before engineering a deterministic pipeline.
+This version uses agent reasoning for substantive gardening and a **bundled read-only PowerShell inventory script** for mechanical candidate discovery on locally accessible BM projects. It requires no service, new database, custom MCP, hash manifest, or elaborate automation. The purpose is to establish whether gardening improves future retrieval and knowledge quality.
 
 ## 1. Invocation contract and scope
 
@@ -62,6 +62,7 @@ The [customized capture skill](../memory-capture/SKILL.md) creates notes without
 3. If the corpus is Git-backed, inspect the working tree before applying changes. A dirty tree does not block an audit; it means edits need an isolated/reviewable plan, not blind overwrites. If no Git history is available, preserve originals another reliable way before consequential rewrites.
 4. Identify any note classes and conventions already in use: frontmatter fields, source folders, personal/sessions/, canonical topics, hub/index notes, task statuses, and relation vocabulary. **Adapt to existing structure rather than impose a new taxonomy.**
 5. Confirm scope, mode, and any required approval. For a first run, prefer a plan with a few concrete examples rather than a corpus-wide rewrite.
+6. **Locate this skill's own directory**, not the current shell working directory. When the BM project is locally accessible and PowerShell is available, check that `scripts/Find-GardenCandidates.ps1` is present under the installed skill directory; run it as instructed in §4.1. The script ships with the skill and must not be installed or maintained separately.
 
 BM primitives to use where available:
 - list_projects, list_directory, recent_activity for orientation.
@@ -77,7 +78,24 @@ BM primitives to use where available:
 
 ### 4.1 Build a scoped inventory
 
-On a first pass, discover files under the authorized folder, not just those returned by search. Use BM directory listing and, when the project is local, a read-only filesystem listing. Record for each **candidate**:
+**Run the bundled inventory script first whenever the BM project root is accessible on the local filesystem and PowerShell is available.** This is the standard candidate-discovery step, not a separate service or an optional manual prerequisite. It is read-only and does not call an LLM. Use the installed skill directory as the script base path, not the repository root or Copilot's current working directory.
+
+```powershell
+# Illustrative user-level Copilot skill installation; resolve the actual
+# installed skill directory if yours differs.
+$skillDir = Join-Path $HOME '.copilot\skills\memory-garden'
+$inventoryScript = Join-Path $skillDir 'scripts\Find-GardenCandidates.ps1'
+& $inventoryScript -Root 'C:\path\to\bm-project' -Folder 'engineering'
+
+# To include already-reviewed notes in a complete inventory:
+& $inventoryScript -Root 'C:\path\to\bm-project' -IncludeUnchanged
+```
+
+Pass the **actual registered BM project root** as `-Root`, and the optional requested relative subtree as `-Folder`; omit `-Folder` for a whole-project run. The default output lists Markdown notes missing a watermark or modified since it; `-IncludeUnchanged` also lists previously reviewed, unchanged notes. Each row contains the relative path, size, mtime, watermark, archive flag, and candidate reason. **Use this output to decide which notes to investigate**, then use BM search/read/graph tools for substantive analysis. A script candidate is not proof of stale knowledge, and an unchanged note may still be relevant when linked evidence changes.
+
+If the project is cloud-only, PowerShell is unavailable, or the installed script cannot be executed, **report that limitation** and fall back to BM directory listings and read-only tools. Do not silently assume the script ran. Never download the corpus or change PowerShell execution policy solely to run it.
+
+Discover files under the authorized folder, not just those returned by search. Record for each **candidate**:
 
 - BM project, physical relative path, title, permalink, type, tags, thread_id (if any), and whether **archived: true** is present (a missing field is normal).
 - Whether it is an active session checkpoint, completed checkpoint, canonical note, imported/source evidence, navigation note, or already archived note.
@@ -105,7 +123,7 @@ Do not rank by age alone. An old decision may remain current; a newly modified n
 Use the **per-note frontmatter timestamp `last_gardened_at`** as the only persistent watermark. No external manifest, private database, content hashes, processing queue, or deterministic gardening engine. The timestamp records a **successfully completed gardening review**, not a claim that every fact is verified.
 
 1. Compare each note's filesystem **last modified time** to `last_gardened_at`. If absent, it is eligible for first review. If mtime is meaningfully newer, it is eligible again; otherwise ordinarily skip substantive LLM re-review.
-2. Use the optional read-only `scripts/Find-GardenCandidates.ps1` helper to list eligible notes and size signals without loading full bodies. The LLM decides what, if anything, should change. No resource budgets or candidate caps are imposed.
+2. **Use the bundled `scripts/Find-GardenCandidates.ps1` at the beginning of each local gardening pass**, as shown in §4.1, to identify missing/expired watermarks and size signals without loading full bodies. The LLM decides what, if anything, should change. If the script is unavailable, report the fallback used. No resource budgets or candidate caps are imposed.
 3. Consider directly related notes when changed evidence implies a contradiction, supersession, broken link, or affected canonical conclusion, even if those neighbors are unchanged. An explicit deep/force request may revisit unchanged notes.
 4. In **apply** mode, after a non-live note has been reviewed and all actions verified, write `last_gardened_at` using the actual offset-aware ISO 8601 time. A pending/failed note must **not** receive a successful watermark. In `audit`/`plan` modes, do not write watermarks.
 5. A watermark-only frontmatter update itself advances file mtime. Treat the small mtime difference from that write as *the same gardening event* (the helper uses a few seconds' tolerance). This is approximate: a near-simultaneous external edit could be missed. Recheck before consequential writes and force review when in doubt.
@@ -352,7 +370,7 @@ Use a small, representative test corpus or a reviewed subset of real notes. Incl
 7. An archived note linked from a current note: both graph navigation and explicit historical retrieval still work.
 8. A legacy note without archived metadata: it is treated as **unarchived**, discoverable in ordinary unfiltered searches, without a classification rewrite.
 9. A folder-scoped pass: no writes outside the selected subtree, even when search finds outside notes.
-10. A second run on a stable, successfully stamped authored note: `last_gardened_at` allows it to be skipped without a deep LLM review; no repeat Markdown mtime churn.
+10. A second run on a stable, successfully stamped authored note: the bundled script finds it unchanged and `last_gardened_at` allows it to be skipped without a deep LLM review; no repeat Markdown mtime churn.
 11. An interrupted or conflicted edit: no false success and no lost original.
 12. A sample retrieval benchmark: correctness, source freshness, number of relevant tool calls, and context volume.
 13. A new gardener-created canonical note is discoverable without archive metadata and is not excluded from normal current answers.
