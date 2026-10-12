@@ -52,7 +52,7 @@ class InventoryTests(unittest.TestCase):
             raise AssertionError("The read-only inventory changed synthetic source files.")
 
     def test_all_scoped_markdown_files_are_discovered(self):
-        self.assertEqual(len(self.rows), 15)
+        self.assertEqual(len(self.rows), 17)
 
     def test_active_and_unknown_captures_are_protected(self):
         for name in ("active", "legacy", "duplicate-status", "unfamiliar-status", "status-only", "empty-thread"):
@@ -77,6 +77,19 @@ class InventoryTests(unittest.TestCase):
 
     def test_archived_capture_remains_protected(self):
         self.assertEqual(self.rows["captures/archived.md"]["Protection"], "archived-capture")
+
+    def test_duplicate_archive_cannot_remove_capture_protection(self):
+        row = self.rows["captures/duplicate-archive.md"]
+        self.assertTrue(row["Archived"])
+        self.assertTrue(row["AmbiguousCaptureMetadata"])
+        self.assertEqual(row["Protection"], "archived-capture")
+
+    def test_unterminated_frontmatter_cannot_certify_completion_or_unchanged(self):
+        row = self.rows["captures/unterminated.md"]
+        self.assertEqual(row["CaptureStatus"], "unknown")
+        self.assertTrue(row["AmbiguousCaptureMetadata"])
+        self.assertEqual(row["Reason"], "invalid-frontmatter")
+        self.assertEqual(row["Protection"], "potentially-live-capture")
 
     def test_source_reference_does_not_duplicate_capture_identity(self):
         row = self.rows["topics/canonical.md"]

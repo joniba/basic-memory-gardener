@@ -123,6 +123,11 @@ Pass the **actual registered BM project root** as `-Root`, and the optional requ
 
 If the project is cloud-only, PowerShell is unavailable, or the installed script cannot be executed, **report that limitation** and fall back to BM directory listings and read-only tools. Do not silently assume the script ran. Never download the corpus or change PowerShell execution policy solely to run it.
 
+The helper is a scalar inventory, not a full YAML validator. Duplicate capture
+or archive fields are ambiguous; any observed `archived: true` stays protective.
+An unterminated header remains eligible and cannot certify completion.
+Confirm actual frontmatter through BM before any authorized mutation.
+
 Discover files under the authorized folder, not just those returned by search. Record for each **candidate**:
 
 - BM project, physical relative path, title, permalink, type, tags, thread_id (if any), and whether **archived: true** is present (a missing field is normal).

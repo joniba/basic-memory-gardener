@@ -37,8 +37,8 @@ Re-read/index targets and demonstrate a realistic retrieval answer.
 
 ## 4. Legacy, invalid, and conflicting lifecycle
 
-Input: legacy role, no status, unfamiliar `reopened`, or duplicate
-active/completed fields.
+Input: legacy role, no status, unfamiliar `reopened`, duplicate active/completed
+fields, conflicting archive markers, or an unterminated frontmatter header.
 
 Expected: potentially active and read-only to the gardener. Do not infer
 completion from age, process absence, a timestamp or a task marked done.

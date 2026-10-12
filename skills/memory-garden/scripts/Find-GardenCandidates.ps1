@@ -7,7 +7,7 @@
   Notes missing an explicit, valid, offset-aware 'modified' stay eligible:
   Basic Memory's indexed 'updated_at' may otherwise be an mtime fallback.
   No hashes, databases, manifests, budgets, LLM calls, or file writes.
-  Missing 'archived' means NOT archived. Reads frontmatter, not note bodies.
+  Missing 'archived' means NOT archived. Reads top-level frontmatter scalars.
   Role/capture protection is advisory. Completion is never inferred from age;
   the helper cannot detect every concurrent writer or authorize mutation.
 .EXAMPLE
@@ -49,18 +49,25 @@ function Get-FrontmatterValues {
         NoteRole = $null; CaptureStatus = $null; HasThreadId = $false
         HasCaptureStatus = $false; SawCaptureRole = $false
         SawSourceRole = $false; AmbiguousCaptureMetadata = $false
+        InvalidFrontmatter = $false
     }
     $seen = @{}
     $reader = [System.IO.StreamReader]::new($FilePath)
     try {
         if ($reader.ReadLine() -ne '---') { return $result }
+        $result.InvalidFrontmatter = $true
         while (($line = $reader.ReadLine()) -ne $null) {
-            if ($line -eq '---') { break }
+            if ($line -eq '---') {
+                $result.InvalidFrontmatter = $false
+                break
+            }
             # Only top-level scalar YAML fields. A nested 'modified' is not
             # the Basic Memory canonical note timestamp.
             if ($line -match '^archived:\s*(?<value>[^#]*?)\s*(?:#.*)?$') {
                 $raw = $Matches.value.Trim().Trim([char]39,[char]34)
-                $result.Archived = ($raw -ieq 'true')
+                if ($seen.ContainsKey('archived')) { $result.AmbiguousCaptureMetadata = $true }
+                $seen['archived'] = $true
+                $result.Archived = $result.Archived -or ($raw -ieq 'true')
             } elseif ($line -match '^modified:\s*(?<value>[^#]*?)\s*(?:#.*)?$') {
                 $result.Modified = $Matches.value.Trim().Trim([char]39,[char]34)
             } elseif ($line -match '^last_gardened_at:\s*(?<value>[^#]*?)\s*(?:#.*)?$') {
@@ -86,6 +93,7 @@ function Get-FrontmatterValues {
                 }
             }
         }
+        if ($result.InvalidFrontmatter) { $result.AmbiguousCaptureMetadata = $true }
     } finally {
         $reader.Dispose()
     }
@@ -134,7 +142,9 @@ Get-ChildItem -LiteralPath $scanRoot -File -Recurse -Filter '*.md' | ForEach-Obj
         'none'
     }
 
-    $reason = if ([string]::IsNullOrWhiteSpace($fm.LastGardenedAt)) {
+    $reason = if ($fm.InvalidFrontmatter) {
+        'invalid-frontmatter'
+    } elseif ([string]::IsNullOrWhiteSpace($fm.LastGardenedAt)) {
         'never-gardened'
     } elseif ($null -eq $gardened) {
         'invalid-watermark'

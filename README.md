@@ -114,6 +114,8 @@ The helper reads top-level frontmatter scalars plus file sizes/paths, not note b
 It also reads role/capture fields and reports conservative advisory protection.
 A thread-keyed or role-marked capture without valid completion is potentially
 live; duplicate lifecycle keys are ambiguous, not permission to edit.
+Conflicting archive markers retain any true protection; unterminated
+frontmatter cannot certify completion or unchanged state.
 `source_thread_id` does not turn a derived topic into a capture. Explicit
 `source_evidence` remains read-only. These hints do not discover every writer
 or override the skill's coordination/retention rules.
