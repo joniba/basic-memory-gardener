@@ -164,3 +164,8 @@ helper, existing timestamp behavior, lifecycle ambiguity and scope safety.
 Tests verify bundled links and cross-skill policy statements; they are not proof
 of semantic LLM promotion. Use the synthetic acceptance scenarios for that
 separate review and report whether it actually ran.
+
+The scenarios also record a source-only, same-author tabletop review: concrete
+fictional topic coverage, a smaller-note answer and conditional writer handoff.
+Its assumptions and missing BM/tool verification are explicit; it is not
+independent ChatGPT feedback or a live-corpus acceptance result.

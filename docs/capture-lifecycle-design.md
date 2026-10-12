@@ -201,6 +201,12 @@ timestamp/lifecycle compatibility, script immutability, bundled paths, and
 cross-document policy consistency. They do **not** prove LLM semantic
 decomposition or lossless promotion.
 
+The [recorded source-only tabletop review](../tests/capture-lifecycle-scenarios.md#recorded-source-only-tabletop-review-2026-10-12)
+exercises fictional topic coverage and a conditional handoff. It is a
+same-author reasoning check, not independent consultation or operational BM
+verification. It preserves uncertainty about unregistered/unmerged destinations
+and documents remaining acceptance rather than treating helper tests as proof.
+
 The manual synthetic scenarios test active/unknown/completed/reopened/archived
 captures, partial and unavailable promotion, changing evidence, concurrency,
 and retrieval. A successful LLM trial must account for all useful topics,
