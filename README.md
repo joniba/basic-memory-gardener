@@ -159,7 +159,11 @@ python -m unittest discover -s tests -v
 ```
 
 Python 3 and PowerShell 7 are required for the tests, but Basic Memory and a live
-corpus are not. Synthetic frontmatter fixtures exercise the actual read-only
+corpus are not. The fictional Markdown inputs for `Find-GardenCandidates.ps1`
+live in [`tests/Find-GardenCandidates-tests/`](tests/Find-GardenCandidates-tests/),
+not in a Basic Memory project. `tests/test_policy.py` runs the helper against
+these inputs and separately checks general skill/package consistency.
+Synthetic frontmatter fixtures exercise the actual read-only
 helper, existing timestamp behavior, lifecycle ambiguity and scope safety.
 Tests verify bundled links and cross-skill policy statements; they are not proof
 of semantic LLM promotion. Use the synthetic acceptance scenarios for that

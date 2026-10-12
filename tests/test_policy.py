@@ -8,7 +8,7 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parents[1]
-FIXTURES = ROOT / "tests" / "fixtures"
+FIXTURES = ROOT / "tests" / "Find-GardenCandidates-tests"
 HELPER = ROOT / "skills" / "memory-garden" / "scripts" / "Find-GardenCandidates.ps1"
 
 

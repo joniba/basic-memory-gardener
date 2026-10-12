@@ -7,8 +7,8 @@ Do not claim these scenarios ran merely because those tests passed.
 
 ## 1. Active multi-topic source
 
-Input: `fixtures/captures/active.md`, expanded with three synthetic topics:
-a retry decision, timeout measurement, and unresolved rollback authority.
+Input: `Find-GardenCandidates-tests/captures/active.md`, expanded with three
+synthetic topics: a retry decision, timeout measurement, and unresolved rollback authority.
 The owner is still working. The canonical retry note covers only the first.
 
 Expected: inspect every topic; verify the retry home, promote the timeout
@@ -28,8 +28,8 @@ An unmerged PR is not a promotion receipt.
 
 ## 3. Completed source
 
-Input: `fixtures/captures/completed.md`, explicit owner confirmation and no
-overlapping writer. Two reusable topics lack canonical homes.
+Input: `Find-GardenCandidates-tests/captures/completed.md`, explicit owner
+confirmation and no overlapping writer. Two reusable topics lack canonical homes.
 
 Expected: promote into topic-based homes, never one duplicate set per session.
 Keep the complete source body. Completion does not archive it automatically.
@@ -65,7 +65,7 @@ supersedes an entire mixed source. Normal notes omit archived rather than false.
 
 ## 7. Archived checkpoint
 
-Input: `fixtures/captures/archived.md` and automatic capture.
+Input: `Find-GardenCandidates-tests/captures/archived.md` and automatic capture.
 
 Expected: exact thread lookup still finds it. Stop before write; no overwrite,
 silent unarchive, or duplicate thread key. Explicit archive reactivation is a
@@ -92,8 +92,8 @@ results rather than marking incomplete work gardened.
 
 ## 10. Imported evidence and retrieval
 
-Input: `fixtures/sources/evidence.md` and canonical notes linked to archived
-historical evidence.
+Input: `Find-GardenCandidates-tests/sources/evidence.md` and canonical notes
+linked to archived historical evidence.
 
 Expected: imported original unchanged; derive a targeted guide only where useful.
 Current-topic questions prefer canonical authority with relevant source
@@ -118,9 +118,10 @@ content was unchanged during the review. No real corpus records were used.
 
 ### Concrete topic coverage
 
-The source is `fixtures/captures/active.md` (Active synthetic investigation).
-The existing content candidate is `fixtures/topics/canonical.md`
-(Synthetic canonical retry decision). Reading both confirms that the candidate
+The source is `Find-GardenCandidates-tests/captures/active.md`
+(Active synthetic investigation). The existing content candidate is
+`Find-GardenCandidates-tests/topics/canonical.md` (Synthetic canonical retry decision).
+Reading both confirms that the candidate
 covers the retry conditions, limits, rejected alternative, rationale and write
 authority boundary, but not the other two topics.
 
@@ -199,7 +200,8 @@ of executed mutations or complete semantic promotion for every scenario.
 ### Preservation and remaining acceptance
 
 After the review, LF-normalized SHA-256 comparisons confirmed no change to the
-active source, retry candidate, archived capture or imported evidence:
+active source, retry candidate, archived capture or imported evidence. Paths
+below are relative to `Find-GardenCandidates-tests/`:
 
 | Fixture | SHA-256 |
 | --- | --- |
