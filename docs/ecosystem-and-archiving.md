@@ -15,6 +15,30 @@ Research notes for the **BM-native, LLM-first skill with a lightweight read-only
 
 **Conclusion:** We are not first to attempt memory curation. The highest-value first experiment is to **orchestrate existing BM functionality with one tailored skill**, not write a second memory engine. In the community work reviewed, no directly reusable, end-to-end Copilot CLI gardener for a single existing BM project/folder was verified. This is a scoped finding, not a claim that no such project exists anywhere.
 
+## Capture continuity versus canonical knowledge
+
+The [incremental lifecycle design](capture-lifecycle-design.md) distinguishes a
+mutable session handoff from reusable canonical knowledge. The gardener
+preserves original capture bodies, including completed sources, and reports
+topic outcomes rather than using line removals as a success metric. A
+potentially active capture is read-only to the gardener, but useful knowledge
+can still be extracted elsewhere.
+
+The owning writer's normal same-note synthesis remains mutable. After actual
+promotion is verified in the authoritative corpus, it can retain concise
+context and links plus unmatched evidence, constraints, authority and next
+steps. A draft/unmerged note or self-declared current marker does not justify
+pruning. This is not a promise to preserve snapshots of every intermediate
+capture revision, nor permission to replace final sources with pointer-only
+stubs. No new snapshot service or separate archive project is introduced.
+
+`capture_status: active | completed` is explicit continuity metadata;
+unknown is potentially active. Completion is coordinated, reopening is
+authorized, and an automatic checkpoint cannot silently reopen a completed
+capture. This status is independent of knowledge currency and archive
+retirement. Role metadata guides retrieval but must not exclude legacy notes.
+The helper exposes advisory protection only, never write authority.
+
 ## Archiving: what a folder does and does not do
 
 Upstream [memory-lifecycle](https://github.com/basicmachines-co/basic-memory/blob/main/skills/memory-lifecycle/SKILL.md) uses active/ and archive/ folders, and says same-project move_note normally retains permalinks unless update_permalinks_on_move is enabled. The folder is **a human and agent convention**; it does not by itself prove that all BM search results exclude archive/. An agent must explicitly constrain discovery or inspect paths.

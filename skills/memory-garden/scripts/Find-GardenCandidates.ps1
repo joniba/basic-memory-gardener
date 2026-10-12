@@ -8,6 +8,8 @@
   Basic Memory's indexed 'updated_at' may otherwise be an mtime fallback.
   No hashes, databases, manifests, budgets, LLM calls, or file writes.
   Missing 'archived' means NOT archived. Reads frontmatter, not note bodies.
+  Role/capture protection is advisory. Completion is never inferred from age;
+  the helper cannot detect every concurrent writer or authorize mutation.
 .EXAMPLE
   # Run from the installed memory-garden skill's scripts directory:
   .\Find-GardenCandidates.ps1 -Root 'C:\basic-memory\main'
@@ -42,7 +44,13 @@ if (-not (Test-Path -LiteralPath $scanRoot -PathType Container)) {
 
 function Get-FrontmatterValues {
     param([string] $FilePath)
-    $result = @{ Archived = $false; Modified = $null; LastGardenedAt = $null }
+    $result = @{
+        Archived = $false; Modified = $null; LastGardenedAt = $null
+        NoteRole = $null; CaptureStatus = $null; HasThreadId = $false
+        HasCaptureStatus = $false; SawCaptureRole = $false
+        SawSourceRole = $false; AmbiguousCaptureMetadata = $false
+    }
+    $seen = @{}
     $reader = [System.IO.StreamReader]::new($FilePath)
     try {
         if ($reader.ReadLine() -ne '---') { return $result }
@@ -57,6 +65,25 @@ function Get-FrontmatterValues {
                 $result.Modified = $Matches.value.Trim().Trim([char]39,[char]34)
             } elseif ($line -match '^last_gardened_at:\s*(?<value>[^#]*?)\s*(?:#.*)?$') {
                 $result.LastGardenedAt = $Matches.value.Trim().Trim([char]39,[char]34)
+            } elseif ($line -match '^(?<key>note_role|capture_status|thread_id):\s*(?<value>[^#]*?)\s*(?:#.*)?$') {
+                $key = $Matches.key
+                $value = $Matches.value.Trim().Trim([char]39,[char]34)
+                if ($seen.ContainsKey($key)) { $result.AmbiguousCaptureMetadata = $true }
+                $seen[$key] = $true
+                switch ($key) {
+                    'thread_id' { $result.HasThreadId = $true }
+                    'capture_status' {
+                        $result.HasCaptureStatus = $true
+                        $result.CaptureStatus = $value
+                    }
+                    'note_role' {
+                        $result.NoteRole = $value
+                        if ($value -cin @('session_capture', 'thread_capture', 'thread_capture_and_project_index')) {
+                            $result.SawCaptureRole = $true
+                        }
+                        if ($value -ceq 'source_evidence') { $result.SawSourceRole = $true }
+                    }
+                }
             }
         }
     } finally {
@@ -87,6 +114,25 @@ Get-ChildItem -LiteralPath $scanRoot -File -Recurse -Filter '*.md' | ForEach-Obj
     $fm = Get-FrontmatterValues -FilePath $file.FullName
     $modified = Convert-ExplicitOffsetTimestamp -Value $fm.Modified
     $gardened = Convert-ExplicitOffsetTimestamp -Value $fm.LastGardenedAt
+    $isCapture = $fm.HasThreadId -or $fm.HasCaptureStatus -or $fm.SawCaptureRole
+    $captureStatus = if (-not $isCapture) {
+        $null
+    } elseif (-not $fm.AmbiguousCaptureMetadata -and $fm.CaptureStatus -ceq 'completed') {
+        'completed'
+    } elseif (-not $fm.AmbiguousCaptureMetadata -and $fm.CaptureStatus -ceq 'active') {
+        'active'
+    } else {
+        'unknown'
+    }
+    $protection = if ($isCapture -and $fm.Archived) {
+        'archived-capture'
+    } elseif ($isCapture -and $captureStatus -ne 'completed') {
+        'potentially-live-capture'
+    } elseif ($fm.SawSourceRole) {
+        'source-evidence'
+    } else {
+        'none'
+    }
 
     $reason = if ([string]::IsNullOrWhiteSpace($fm.LastGardenedAt)) {
         'never-gardened'
@@ -110,6 +156,11 @@ Get-ChildItem -LiteralPath $scanRoot -File -Recurse -Filter '*.md' | ForEach-Obj
             LastGardenedAt = $fm.LastGardenedAt
             Archived = $fm.Archived
             Reason = $reason
+            NoteRole = $fm.NoteRole
+            IsCapture = $isCapture
+            CaptureStatus = $captureStatus
+            Protection = $protection
+            AmbiguousCaptureMetadata = $fm.AmbiguousCaptureMetadata
         }
     }
 }

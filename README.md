@@ -7,10 +7,36 @@ A single, **LLM-driven maintenance skill** for a [Basic Memory](https://github.c
 ## Start here
 
 - **[memory-garden skill](skills/memory-garden/SKILL.md)** — the complete operational instructions.
-- **[Customized memory-capture skill](skills/memory-capture/SKILL.md)** — upstream capture behavior with safeguards against silently reactivating archived checkpoints; ordinary notes omit `archived`.
+- **[Customized memory-capture skill](skills/memory-capture/SKILL.md)** — same-thread synthesis, verified compact handoffs and explicit lifecycle/archive guards; ordinary notes omit `archived`.
 - **[Global Copilot retrieval instructions](snippets/copilot-global-instructions.md)** — a copy-ready, always-on section for searches, bounded reads, graph navigation, freshness, and archive-aware answers.
 - **[Related community work and archiving notes](docs/ecosystem-and-archiving.md)** — projects, upstream behavior, and limitations.
 - **[Bundled candidate inventory script](skills/memory-garden/scripts/Find-GardenCandidates.ps1)** — shipped with the skill; reads explicit canonical `modified` and `last_gardened_at` from frontmatter without a private state file or filesystem/Git timestamp comparison.
+- **[Capture lifecycle design](docs/capture-lifecycle-design.md)** — incremental roles, ownership, promotion, compact handoffs and completion/resumption contract.
+- **[Synthetic acceptance scenarios](tests/capture-lifecycle-scenarios.md)** — lossless topic coverage and lifecycle cases; helper tests do not prove an LLM completed them.
+
+### Captures and topical knowledge
+
+Captures preserve resumable thread context; canonical topic notes organize
+reusable knowledge across sessions. Keep both in the existing corpus, linked,
+without making two competing current accounts or replacing captures with
+pointer-only stubs. Existing paths remain stable.
+
+The gardener reads potentially active captures and extracts into canonical
+homes without touching the originals. A deep pass reports each useful topic
+as already covered, updated, created, or explicitly deferred. Once a promotion
+is verified and available in the authoritative corpus, the owning capture
+writer can keep concise context/links plus open work, authority, exceptions and
+unpromoted evidence rather than repeating an encyclopedia.
+
+New capture metadata is `note_role: session_capture` and
+`capture_status: active`; completed is recorded only with explicit confirmation.
+Unknown legacy lifecycle is potentially active. Reopening is an authorized
+transition to active, not automatic checkpoint behavior. Completion does not
+imply archival; archived capture reactivation remains explicit.
+
+This is a source-policy candidate, not an automatic corpus migration or
+installed capture replacement. Independent ChatGPT consultation remains pending
+authentication; the design record does not claim an external review occurred.
 
 ### Install the GitHub Copilot CLI plugin
 
@@ -51,19 +77,20 @@ discovery. Pass the exact directory path, not a skill name: removing by name
 can delete a standalone skill. Unregistering a custom directory does not remove
 the source checkout.
 
-### Use the archive-aware memory-capture skill
+### Use the lifecycle-aware memory-capture skill
 
 The existing [Copilot capture bridge](https://github.com/joniba/basic-memory-copilot-bridge)
 calls the skill named `memory-capture`; it does **not** write notes itself. The
 plugin includes a **modified copy of upstream `memory-capture` with the same
-skill name**. It preserves upstream capture behavior but refuses to overwrite
-an explicitly archived checkpoint without authorization. New checkpoints omit
-`archived`.
+skill name**. It preserves upstream synthesis and identity, adds explicit
+completion/resumption and verified-promotion guards, and refuses to overwrite
+an explicitly archived checkpoint without authorization. New checkpoints use
+the capture role and active status, and omit `archived`.
 
 Installing the plugin does not delete or overwrite existing personal skills.
 A higher-precedence standalone `memory-capture` may still win. Inspect the
 effective path with `copilot skill list --json`; do not claim the archive-aware
-copy is active unless that path points into this plugin. Preserve/back up a
+copy and its lifecycle contract are active unless that path points into this plugin. Preserve/back up a
 standalone copy and obtain the applicable approval before retiring it. The
 gardener itself protects live checkpoints regardless of which capture copy is
 active. Do not change the bridge extension, thresholds, or timers to resolve a
@@ -82,7 +109,14 @@ $skillDir = '<absolute installed memory-garden skill directory>'
 & (Join-Path $skillDir 'scripts\Find-GardenCandidates.ps1') -Root 'C:\path\to\bm-project' -Folder 'engineering'
 ```
 
-The helper reads only top-level frontmatter `modified`, `last_gardened_at`, and `archived` plus file sizes/paths. A note is normally skippable when both timestamps are valid, explicit and offset-aware, and `modified <= last_gardened_at`. Missing or ambiguous `modified` is **unknown**, not unchanged; it remains eligible. BM exposes canonical frontmatter `modified` as indexed `updated_at`, but for notes lacking explicit `modified` it may fall back to filesystem mtime. The gardener does **not** use that fallback to certify a note as unchanged.
+The helper reads top-level frontmatter scalars plus file sizes/paths, not note bodies. It compares `modified` with `last_gardened_at` and reports archive state. A note is normally skippable when both timestamps are valid, explicit and offset-aware, and `modified <= last_gardened_at`. Missing or ambiguous `modified` is **unknown**, not unchanged; it remains eligible. BM exposes canonical frontmatter `modified` as indexed `updated_at`, but for notes lacking explicit `modified` it may fall back to filesystem mtime. The gardener does **not** use that fallback to certify a note as unchanged.
+
+It also reads role/capture fields and reports conservative advisory protection.
+A thread-keyed or role-marked capture without valid completion is potentially
+live; duplicate lifecycle keys are ambiguous, not permission to edit.
+`source_thread_id` does not turn a derived topic into a capture. Explicit
+`source_evidence` remains read-only. These hints do not discover every writer
+or override the skill's coordination/retention rules.
 
 Use `-IncludeUnchanged` for a full inventory. For targeted work, BM compact search/recent activity may be cheaper than a broad scan. If the script cannot run, the gardener falls back to BM directory/search/metadata tools. It never stamps live session checkpoints or immutable source documents just to record review.
 
@@ -115,3 +149,16 @@ Project/folder names are examples, not defaults. **Specify the target BM project
 This is the gardener's home. It is **not** the Basic Memory corpus. Do not commit private memory notes, source documents, credentials, or run logs into this public repository. The read-only candidate inventory script is bundled inside the `memory-garden` skill; it never modifies the Basic Memory corpus. Further automation is optional.
 
 The earlier [bridge integration proposal](https://github.com/joniba/basic-memory-copilot-bridge/issues/2) remains useful background, but its hash-based manifest, queue, budgets, and scheduling pipeline are **not part of this simpler skill**. Instead, the per-note `last_gardened_at` watermark and bundled skill script provide lightweight incremental discovery.
+
+## Validate this policy candidate
+
+```powershell
+python -m unittest discover -s tests -v
+```
+
+Python 3 and PowerShell 7 are required for the tests, but Basic Memory and a live
+corpus are not. Synthetic frontmatter fixtures exercise the actual read-only
+helper, existing timestamp behavior, lifecycle ambiguity and scope safety.
+Tests verify bundled links and cross-skill policy statements; they are not proof
+of semantic LLM promotion. Use the synthetic acceptance scenarios for that
+separate review and report whether it actually ran.
