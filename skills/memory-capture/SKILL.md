@@ -5,7 +5,7 @@ description: "Capture the current state of a working thread or conversation into
 
 # Memory Capture
 
-> Adapted from [upstream Basic Memory memory-capture](https://github.com/basicmachines-co/basic-memory/blob/0ad9aa1848baba7374c03168e00d57cdb24c5b14/skills/memory-capture/SKILL.md). Gardener integration protects deliberately archived checkpoints while preserving normal capture and stable thread identity.
+> Adapted from [upstream Basic Memory memory-capture](https://github.com/basicmachines-co/basic-memory/blob/0ad9aa1848baba7374c03168e00d57cdb24c5b14/skills/memory-capture/SKILL.md). Gardener integration preserves review timestamps, normal synthesis, archive guards and stable thread identity.
 
 Capture the gist of a working thread — the decisions made, insights surfaced, and context built — into a single coherent Basic Memory note that reflects where the thread has landed.
 
@@ -27,13 +27,41 @@ Use this skill when:
 
 It is fine — and expected — to invoke this skill multiple times in the same thread as the conversation evolves.
 
+## Capture ownership and gardening metadata
+
+Follow the [shared gardening design](../../docs/capture-lifecycle-design.md).
+This writer owns a resumable thread account, not an encyclopedia or a second
+automatic topic gardener. New notes use `note_role: session_capture`;
+only the capture owns its stable `thread_id`.
+Canonical knowledge may be linked, but derived notes use `source_thread_id`
+rather than duplicating that identity.
+
+This version adds no completion/resumption workflow. Preserve legacy role
+conventions, any existing lifecycle labels, and unrelated metadata without
+creating or transitioning `capture_status`. Ordinary authorized capture keeps
+updating the same unarchived thread regardless of an old completion label.
+
+The gardener preserves capture bodies but may stamp `last_gardened_at` after
+successfully extracting/verifying the reusable knowledge. **Preserve an
+existing `last_gardened_at` exactly; do not create, advance or clear it during
+capture.** Maintain explicit `modified` with the actual offset-aware edit time.
+An updated capture must have `modified` newer than its preserved gardening
+stamp so the next gardening pass can see it changed. If clock/timestamp
+precision prevents that truthful ordering, report the limitation; never
+fabricate a future timestamp or claim reliable incremental skipping.
+
+An archived capture still requires **explicit reactivation authority**, not
+ordinary automatic capture or an ambiguous continuation. Apply the archive
+guard below first. Do not use this skill to mutate another writer's
+checkpoint or archive a source automatically.
+
 ## Archive handling (gardener integration)
 
 **New captures normally omit the `archived` field entirely.** Missing means *not archived*; do not add `archived: false`. Capture is not responsible for classifying or archiving notes.
 
 Before updating a same-thread checkpoint, read its existing frontmatter. If it has `archived: true`, **stop**: do not overwrite, silently unarchive, or create a duplicate checkpoint with the same `thread_id`. Ask for explicit authorization to reactivate it, or use a genuinely new thread identity if appropriate. An existing `archived: false` is harmless legacy metadata and need not be changed. Preserve unrelated custom metadata on overwrite, including source provenance and stable thread ID.
 
-**Never filter exact thread identity lookup by archive state.** Such a filter could hide archived checkpoints and cause duplicates. The gardener, not capture, owns decisions to mark non-live historical notes `archived: true`. Keep capture extension triggers and intervals unchanged.
+**Never filter exact thread identity lookup by archive state.** Such a filter could hide archived checkpoints and cause duplicates. Neither ordinary capture nor gardening archives a capture as a side effect. Separate explicit retirement authority is required. Keep capture extension triggers and intervals unchanged.
 
 ## Same-Thread Detection
 
@@ -60,13 +88,14 @@ To rewrite the same note on re-capture instead of duplicating, key the note to a
      ```python
      search_notes(query="<thread topic>", project="<project>")
      ```
+   - If multiple distinct notes share the key, or the fallback topic match is ambiguous, stop with an identity diagnostic. Do not choose the first hit or create a second capture.
 3. **If a match is found:**
-   - Read the existing note (use the full permalink returned by search) and inspect `archived` frontmatter. If `archived: true`, stop and request explicit authorization before reactivation. Do not create a duplicate checkpoint.
+   - Read the existing note (use the full permalink returned by search) and inspect its frontmatter, including `archived` and any `last_gardened_at`. Apply the archive guard above; preserve review metadata and existing identity. Do not create a duplicate checkpoint.
    - Synthesize a new version that integrates the latest understanding from the conversation
-   - Overwrite via `write_note` with `overwrite=True` (same title, same `thread_id` if used, same directory)
+   - Recheck the exact identity/revision before the edit; use `expected_checksum` where supported. Overwrite via `write_note` with `overwrite=True` only for the authorized same capture (same title, same `thread_id` if used, same directory), preserving unrelated frontmatter and source provenance. Maintain explicit canonical `modified` for the real edit; do not stamp `last_gardened_at` as a side effect.
 4. **If no match is found:**
    - Synthesize the note from the conversation
-   - If you have a thread id, pass `metadata={"thread_id": "<thread-id>"}` to `write_note` (it surfaces as a custom frontmatter field)
+   - Set `note_role: session_capture` and the actual offset-aware `modified` time, without inventing a gardening stamp. If you have a thread id, include it in metadata (it surfaces as a custom frontmatter field).
    - Save it
 
 ## Synthesis Rules
@@ -80,6 +109,15 @@ When updating an existing thread note, **synthesize, don't append**:
 
 Goal: the note reads top-to-bottom as a single coherent document. A reader who never saw the conversation should still understand the outcome from the note alone. There is no `## Changes` section at the bottom; revisions live in the prose where they're relevant.
 
+### Keep capture synthesis separate from gardening
+
+Keep the thread's current outcome, reasons, important evidence, limitations,
+open work, authority and next step. Normal same-thread synthesis still replaces
+outdated working context rather than appending a log. Do not shorten the
+capture merely because a gardener created a subject note or set a review
+stamp. Do not replace it with a pointer-only list, run topic integration
+automatically, or add a promotion-driven compaction workflow.
+
 ## Escape Hatch
 
 If the user explicitly asks for a separate note (e.g., "capture this as a new note, don't merge with the existing thread note"), skip the same-thread lookup and create a fresh note without setting `thread_id`. This is rare; the default is to update.
@@ -91,6 +129,8 @@ If the user explicitly asks for a separate note (e.g., "capture this as a new no
 title: <descriptive title for the thread>
 type: note
 thread_id: <thread-id, if your agent exposes one>
+note_role: session_capture
+modified: <actual offset-aware edit time>
 tags:
 - relevant
 - tags
@@ -156,17 +196,27 @@ write_note(
     content="<markdown body — frontmatter is generated from title/tags/metadata>",
     directory="<folder>",
     tags=["..."],
-    metadata={"thread_id": "<thread-id>"},  # omit if no stable id
+    metadata={
+        "thread_id": "<thread-id>",  # omit if no stable id
+        "note_role": "session_capture",
+        "modified": "<actual offset-aware edit time>",
+    },
     project="<project>"
 )
 
-# Overwrite an existing note (same path)
+# Preserve custom metadata, including the gardener's existing review stamp.
+updated_metadata = {
+    **existing_frontmatter,
+    "modified": "<actual offset-aware edit time>",
+}
+
+# Overwrite an existing note (same path, preserving unrelated fields)
 write_note(
     title="<same title>",
     content="<new content>",
     directory="<same folder>",
     tags=["..."],
-    metadata={"thread_id": "<same thread-id>"},  # omit if no stable id
+    metadata=updated_metadata,
     overwrite=True,
     project="<project>"
 )
@@ -187,6 +237,8 @@ write_note(
 title: Visual identity — initial decisions
 type: note
 thread_id: 7c1d4a2e-3b5f-4d8a-9e1c-2f6b8a4d7c39
+note_role: session_capture
+modified: <actual offset-aware edit time>
 tags:
 - branding
 - design
@@ -233,6 +285,8 @@ Working through the visual identity for the new product. This thread covers the 
 title: Visual identity — initial decisions
 type: note
 thread_id: 7c1d4a2e-3b5f-4d8a-9e1c-2f6b8a4d7c39
+note_role: session_capture
+modified: <actual offset-aware edit time>
 tags:
 - branding
 - design

@@ -7,7 +7,9 @@
   Notes missing an explicit, valid, offset-aware 'modified' stay eligible:
   Basic Memory's indexed 'updated_at' may otherwise be an mtime fallback.
   No hashes, databases, manifests, budgets, LLM calls, or file writes.
-  Missing 'archived' means NOT archived. Reads frontmatter, not note bodies.
+  Missing 'archived' means NOT archived. Reads top-level frontmatter scalars.
+  Role/capture body protection is advisory, independent of legacy status.
+  The helper does not authorize mutation.
 .EXAMPLE
   # Run from the installed memory-garden skill's scripts directory:
   .\Find-GardenCandidates.ps1 -Root 'C:\basic-memory\main'
@@ -42,23 +44,60 @@ if (-not (Test-Path -LiteralPath $scanRoot -PathType Container)) {
 
 function Get-FrontmatterValues {
     param([string] $FilePath)
-    $result = @{ Archived = $false; Modified = $null; LastGardenedAt = $null }
+    $result = @{
+        Archived = $false; Modified = $null; LastGardenedAt = $null
+        NoteRole = $null; CaptureStatus = $null; HasThreadId = $false
+        HasCaptureStatus = $false; SawCaptureRole = $false
+        SawSourceRole = $false; AmbiguousCaptureMetadata = $false
+        InvalidFrontmatter = $false; AmbiguousTimestamps = $false
+    }
+    $seen = @{}
     $reader = [System.IO.StreamReader]::new($FilePath)
     try {
         if ($reader.ReadLine() -ne '---') { return $result }
+        $result.InvalidFrontmatter = $true
         while (($line = $reader.ReadLine()) -ne $null) {
-            if ($line -eq '---') { break }
+            if ($line -eq '---') {
+                $result.InvalidFrontmatter = $false
+                break
+            }
             # Only top-level scalar YAML fields. A nested 'modified' is not
             # the Basic Memory canonical note timestamp.
             if ($line -match '^archived:\s*(?<value>[^#]*?)\s*(?:#.*)?$') {
                 $raw = $Matches.value.Trim().Trim([char]39,[char]34)
-                $result.Archived = ($raw -ieq 'true')
+                if ($seen.ContainsKey('archived')) { $result.AmbiguousCaptureMetadata = $true }
+                $seen['archived'] = $true
+                $result.Archived = $result.Archived -or ($raw -ieq 'true')
             } elseif ($line -match '^modified:\s*(?<value>[^#]*?)\s*(?:#.*)?$') {
+                if ($seen.ContainsKey('modified')) { $result.AmbiguousTimestamps = $true }
+                $seen['modified'] = $true
                 $result.Modified = $Matches.value.Trim().Trim([char]39,[char]34)
             } elseif ($line -match '^last_gardened_at:\s*(?<value>[^#]*?)\s*(?:#.*)?$') {
+                if ($seen.ContainsKey('last_gardened_at')) { $result.AmbiguousTimestamps = $true }
+                $seen['last_gardened_at'] = $true
                 $result.LastGardenedAt = $Matches.value.Trim().Trim([char]39,[char]34)
+            } elseif ($line -match '^(?<key>note_role|capture_status|thread_id):\s*(?<value>[^#]*?)\s*(?:#.*)?$') {
+                $key = $Matches.key
+                $value = $Matches.value.Trim().Trim([char]39,[char]34)
+                if ($seen.ContainsKey($key)) { $result.AmbiguousCaptureMetadata = $true }
+                $seen[$key] = $true
+                switch ($key) {
+                    'thread_id' { $result.HasThreadId = $true }
+                    'capture_status' {
+                        $result.HasCaptureStatus = $true
+                        $result.CaptureStatus = $value
+                    }
+                    'note_role' {
+                        $result.NoteRole = $value
+                        if ($value -cin @('session_capture', 'thread_capture', 'thread_capture_and_project_index')) {
+                            $result.SawCaptureRole = $true
+                        }
+                        if ($value -ceq 'source_evidence') { $result.SawSourceRole = $true }
+                    }
+                }
             }
         }
+        if ($result.InvalidFrontmatter) { $result.AmbiguousCaptureMetadata = $true }
     } finally {
         $reader.Dispose()
     }
@@ -87,8 +126,22 @@ Get-ChildItem -LiteralPath $scanRoot -File -Recurse -Filter '*.md' | ForEach-Obj
     $fm = Get-FrontmatterValues -FilePath $file.FullName
     $modified = Convert-ExplicitOffsetTimestamp -Value $fm.Modified
     $gardened = Convert-ExplicitOffsetTimestamp -Value $fm.LastGardenedAt
+    $isCapture = $fm.HasThreadId -or $fm.HasCaptureStatus -or $fm.SawCaptureRole
+    $protection = if ($isCapture -and $fm.Archived) {
+        'archived-capture'
+    } elseif ($fm.SawSourceRole) {
+        'source-evidence'
+    } elseif ($isCapture) {
+        'capture-body'
+    } else {
+        'none'
+    }
 
-    $reason = if ([string]::IsNullOrWhiteSpace($fm.LastGardenedAt)) {
+    $reason = if ($fm.InvalidFrontmatter) {
+        'invalid-frontmatter'
+    } elseif ($fm.AmbiguousTimestamps) {
+        'ambiguous-timestamps'
+    } elseif ([string]::IsNullOrWhiteSpace($fm.LastGardenedAt)) {
         'never-gardened'
     } elseif ($null -eq $gardened) {
         'invalid-watermark'
@@ -110,6 +163,12 @@ Get-ChildItem -LiteralPath $scanRoot -File -Recurse -Filter '*.md' | ForEach-Obj
             LastGardenedAt = $fm.LastGardenedAt
             Archived = $fm.Archived
             Reason = $reason
+            NoteRole = $fm.NoteRole
+            IsCapture = $isCapture
+            CaptureStatus = $fm.CaptureStatus
+            Protection = $protection
+            AmbiguousCaptureMetadata = $fm.AmbiguousCaptureMetadata
+            AmbiguousTimestamps = $fm.AmbiguousTimestamps
         }
     }
 }

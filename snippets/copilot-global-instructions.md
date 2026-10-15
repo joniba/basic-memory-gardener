@@ -12,6 +12,24 @@ Basic Memory (BM) is the shared knowledge corpus. The **memory-garden** skill ma
 4. **Read progressively.** Inspect title, permalink, frontmatter, headings, and relevant excerpts before loading a body. Prefer `read_note` with `start_line`/`end_line` for long notes. Its `page`/`page_size` parameters paginate *fallback suggestions*, **not** note content. Use `bm grep "term" -C 3 --project PROJECT` for line-numbered literal match windows if available. Fall back to read-only local line excerpts when BM lacks bounded reads; do not dump a 50 KB note merely to find one fact.
 5. **Traverse selectively.** Once a relevant anchor is found, use `build_context` with `depth=1`, `compact=true`, and a small `max_related` when supported. Inspect relation direction/type and verify selected neighbor notes. A relation does not establish correctness or currency.
 
+**Capture versus canonical authority:** Session captures answer continuation and
+thread-history questions; canonical topic notes answer reusable current-topic
+questions across sessions. Prefer the relevant role, not the newest/largest
+match. New roles are `session_capture`, `canonical_topic`, and `source_evidence`;
+preserve existing conventions and never use role equality to hide legacy notes.
+A canonical note may lag newer source evidence; a retained synthesis is not
+proof that every claim in it is true. Inspect source sections/revisions and
+limitations where the distinction matters.
+
+Legacy capture status labels do not control ordinary retrieval or gardening.
+The gardener preserves capture bodies and updates only successful review
+metadata; sessions maintain their own capture summaries and preserve that stamp.
+Normal retrieval does not close/reopen, stamp, compact, or archive notes.
+An exact `thread_id` lookup must find the original even when archived; it must
+never create a second identity by filtering the original out.
+Current answers should not treat a draft branch or unmerged topic note as
+available canonical authority merely because it contains proposed promotion.
+
 **Current versus historical knowledge:** A missing `archived` field means **not archived**. The gardener adds `archived: true` only to deliberately retired notes; an existing `archived: false` is harmless but not required. For normal current-state questions, search **without an archive metadata filter**, inspect the returned notes' metadata, and exclude `archived: true` from current answers. **Do not search explicitly for `archived: true`, or treat archived notes as current, merely because a current search failed.** Reformulate, paginate, inspect canonical/source references, or state that current information could not be found. Historical evidence is appropriate only when the user specifically requests history, old-vs-new comparison, why a decision changed, or another explicitly historical perspective; the gardener's own maintenance work is a separate exception. Linked graph neighbors can be archived even if the anchor is current; inspect their status.
 
 **Why no default `archived: false` filter?** BM equality requires the key to exist: `metadata_filters={"archived": False}` hides all ordinary unmarked notes. BM has no `$ne` predicate and no single metadata OR combining missing and false. If archived hits dominate a search, separate `metadata_filters={"archived": None}` (missing/null) and `metadata_filters={"archived": False}` (legacy explicit false) searches are an optional discovery workaround; combine and verify results. Those metadata filters only match Markdown notes, not indexed non-Markdown source files. Never make archived:true a routine fallback.
