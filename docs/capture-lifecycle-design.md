@@ -1,9 +1,10 @@
-# Capture lifecycle and canonical knowledge
+# Captures, subject notes, and incremental gardening
 
-**Status:** implemented policy candidate for review. External ChatGPT
-consultation is pending because the research browser requires authentication;
-no source documents or prompt have been submitted. This document records the
-maintainer's decisions, not a claimed external endorsement.
+**Status:** simplified policy candidate for review. It replaces the earlier
+completion/resumption and writer-compaction proposal. External ChatGPT
+consultation is pending because the available routes require authentication;
+no review material was delivered. Source checks and independent code review
+are not a claim of successful gardening in a real Basic Memory corpus.
 
 ## 1. Whole-system design
 
@@ -13,28 +14,32 @@ knowledge into canonical topic notes and maintains those notes over time.
 Ordinary retrieval chooses the appropriate role rather than treating every
 matching note as an equally authoritative current account.
 
-The gardener preserves capture originals. The capture writer may synthesize
-its own active account, retaining important unpromoted information while
-replacing repeated, verified topical explanations with concise context and
-links. Completed sources remain complete; they are not replaced by pointer-only
-stubs. A navigation companion is optional, not a third mandatory storage layer.
+Sessions maintain their own captures; one gardener maintains reusable subject
+notes. The gardener preserves every capture body, active or finished. Its only
+capture edit is successful review metadata, so unchanged sources can be
+skipped later. It never replaces a capture with a pointer-only stub. A
+navigation companion is optional, not a third mandatory storage layer.
+
+Capture files do not shrink. The benefit is that future questions can read a
+smaller subject note instead of a whole session. Normal capture synthesis
+continues, but shortening captures because knowledge was extracted is outside
+this gardening version.
 
 No service, MCP server, new database, snapshot store, mutation engine, periodic
 job, or bridge-trigger change is introduced. The bundled PowerShell helper is
-read-only discovery; it reports advisory role/lifecycle protection, not permission
+read-only discovery; it reports advisory capture-body protection, not permission
 to edit.
 
 | Component | Responsibility | Not its responsibility |
 | --- | --- | --- |
-| Capture writer | Same-thread continuity, current synthesis, explicit completion/resumption | Automatic topic integration, archive decisions, changes to other threads |
-| Gardener | Topic coverage, promotion, canonical maintenance, deliberate non-live retirement | Mutating potentially active captures or overwriting source evidence |
+| Capture writer | Same-thread synthesis; preserve review stamp; update real modification time | Gardening, advancing review stamps, new completion/resumption workflow |
+| Gardener | Topic coverage, subject-note maintenance, successful review timestamps | Changing capture bodies/paths, shortening captures, overwriting imported evidence |
 | Retrieval guidance | Canonical-first current questions; capture-first continuation/history | Certifying truth from role, archive metadata, or search rank |
-| Inventory helper | Canonical timestamps and conservative role/lifecycle hints | Detecting all live writers or implementing promotion |
-| User/owning writer | Completion/resumption authority and maintenance coordination | Being silently replaced by a timestamp heuristic |
+| Inventory helper | Explicit timestamp comparison and advisory identity/protection hints | Editing notes, deciding knowledge quality or granting write authority |
 
 ## 2. Backward-compatible identity and metadata
 
-New captures use `note_role: session_capture` and `capture_status: active`.
+New captures use `note_role: session_capture`.
 New topical notes may use `note_role: canonical_topic`; imported evidence can
 use `note_role: source_evidence`. Established role conventions and paths are
 preserved rather than mass-normalized.
@@ -42,17 +47,15 @@ preserved rather than mass-normalized.
 The stable `thread_id` belongs only to its capture. Topical notes can refer to
 the source with `source_thread_id` and an exact source link, never copy the
 capture's thread key. A legacy `thread_capture_and_project_index` remains a
-capture, not an automatically writable canonical note.
+capture, not an automatically writable subject note.
 
-`capture_status` has two valid values: `active` and `completed`. Reopening is
-a transition to `active`, not a permanent third state. A missing, invalid, or
-unfamiliar status on a capture means **potentially active**. Never infer
-completion from age, process absence, a task marked done, a directory, a
-gardening watermark, or the end of a model turn.
+Legacy `capture_status` fields are preserved, not created or transitioned.
+Whether a source says active, completed, something unfamiliar, or nothing
+does not change its body protection or require a special resumption decision.
+The helper reports raw legacy status only as a compatibility hint.
 
-Lifecycle, authority, currency, and retirement are independent:
+Role, currency, retirement and review are different:
 
-- `capture_status` describes thread continuity.
 - `note_role` describes intended use, not verified truth.
 - `knowledge_status` describes currency supported by evidence.
 - `archived: true` records deliberate retirement from current use.
@@ -60,28 +63,45 @@ Lifecycle, authority, currency, and retirement are independent:
 
 No default `archived: false`, lifecycle backfill, or duplicated project is added.
 
-## 3. Ownership and lifecycle transitions
+## 3. Capture review timestamps
 
-| Existing capture | Current instruction | Allowed behavior |
-| --- | --- | --- |
-| Active or unknown | Ordinary authorized capture | Same-note synthesis by its writer |
-| Active or unknown | Gardener apply | Read/extract only; no body, metadata, stamp, rename, move, or archive |
-| Active | Explicit completion confirmation with coordination | Writer records completed; turn completion alone is insufficient |
-| Completed, unarchived | Gardening with confirmed writer coordination | Preserve complete body; promote and apply approved lifecycle/review metadata |
-| Completed, unarchived | Explicit user request to resume that thread | Recheck revision, set active, synthesize same identity |
-| Completed, unarchived | Automatic checkpoint only | Stop with a lifecycle diagnostic; no silent reopen or duplicate |
-| Archived | Normal capture or automatic checkpoint | Stop; no overwrite, unarchive, or duplicate |
-| Archived | Explicit reactivation authority | Preserve identity/provenance, clear retirement deliberately, set active |
+Reuse `last_gardened_at`; do not introduce a second `gardened_at` convention.
+Compare it with explicit top-level `modified`, using valid offset-aware times:
 
-Completion does not imply archival. A completed thread may remain useful as
-continuity or decision evidence. If writer coordination is uncertain, the
-gardener stays plan-only on that capture. Even completed notes can be reopened:
-explicit status is not a substitute for checking concurrent changes.
+| Stored state | Ordinary next pass |
+| --- | --- |
+| `modified <= last_gardened_at` | Skip deep re-review, including equality and equivalent offsets |
+| `modified > last_gardened_at` | Review the changed capture |
+| Missing, invalid or duplicate timestamp | Keep eligible; do not guess |
+| Unterminated frontmatter | Keep eligible and resolve the malformed header before editing |
 
-The existing archived-capture guard remains stronger than ordinary resumption:
-"continue" does not silently authorize unarchiving a deliberately retired
-record. Exact thread lookup includes archived notes so it cannot create a
-second capture by hiding the first.
+Do not use filesystem modification time, Git time or an indexed `updated_at`
+that may be a fallback for missing canonical `modified`. Relevant changed
+evidence or an explicit deep request may justify revisiting an unchanged note.
+
+In apply mode, stamp an authored, unarchived capture only after its whole
+in-scope processing and destination verification succeed. An already-covered
+topic counts after inspecting its actual home. Partial, deferred, failed,
+sampled or proposal-only work leaves the source stamp unchanged. Audit and
+plan never stamp. Keep outcomes in the report, not in the capture body.
+
+Use a metadata-only BM edit with supported revision preconditions. Preserve the
+complete body, identity, path and unrelated metadata. The stamp is itself a
+real edit: set `modified` and `last_gardened_at` consistently to its actual
+offset-aware edit/review time where supported, then read back and verify the
+body and `modified <= last_gardened_at`. A writer-generated modification time
+must not cause an endless review loop. If the writer cannot save a consistent
+pair, report the limitation and keep the note eligible; never invent past or
+future dates to make it skippable.
+
+The capture writer preserves an existing gardening stamp exactly and advances
+`modified` for its actual summary updates. It never creates, advances or clears
+the review stamp. This makes later content changes eligible again. Missing
+timestamps on legacy notes remain unknown until a real edit provides them.
+
+Imported evidence remains immutable, including sources with capture-like
+metadata. Already archived captures are read-only without separate authority.
+Neither ordinary capture nor gardening silently unarchives or duplicates them.
 
 ## 4. Topic decomposition is required reasoning, not file churn
 
@@ -104,63 +124,33 @@ manifest and must not be written into an active capture by the gardener.
 Large-note size is a discovery signal, not a splitting threshold or deletion
 target. A long, focused note can remain focused and complete.
 
-## 5. Verified promotion and safe writer compaction
+## 5. Verify useful subject notes
 
-Promotion is available for compaction only after the writer verifies:
+Before claiming successful processing, read the actual destination in the
+registered authoritative BM project. Verify relevant content, rationale,
+limitations, source identity and links; confirm indexing and answer a realistic
+topic question without reading the whole capture. A `current` marker, link,
+accepted write, proposed file or unmerged PR alone is not enough. Compare
+relevant changed evidence rather than assuming a newer timestamp proves truth.
 
-- The exact destination exists in the registered authoritative BM project,
-  rather than only a proposed branch, patch, pending write, or unmerged PR.
-- The note is not archived and its relevant content actually covers the source
-  topic, including important rationale, uncertainty, and boundaries.
-- Provenance identifies the source capture and, where practical, the relevant
-  section and actual source revision metadata. Record only observed values.
-- Readback and indexing succeed, important links resolve, and a realistic topic
-  question can be answered without reading the entire capture.
-- Relevant source or destination changes since review have been considered;
-  a changed timestamp alone neither invalidates nor certifies every fact.
+Preserve source dates and observed revision metadata; re-read relevant source
+material when revision data is missing. Never invent a historical timestamp.
+Verification decides whether work succeeded and can be stamped, not whether
+the gardener may prune a source. Capture bodies stay complete in all cases.
 
-A `current` marker, link, watermark, receipt, Git commit, or accepted tool write
-alone is not sufficient. An indexed `updated_at` can be an mtime fallback.
-Missing source revision data requires re-reading the relevant source material,
-not inventing a historic `modified` or building a hash queue.
+## 6. Simple ownership and preservation
 
-The capture writer can then keep a compact, substantive handoff:
+Run one gardener at a time. No capture pause, maintenance-window requirement,
+new locking protocol or capture completion/resumption workflow is introduced.
+Still use supported checksum checks for individual edits. On an actual
+conflict, ambiguous identity or failed indexing, stop that edit and report
+unfinished work without a new source stamp; never force an overwrite.
 
-- What the thread concerns and its latest settled outcome.
-- Canonical links with enough context to make the handoff useful.
-- Open work, blockers, constraints, action-specific authority, and next step.
-- Unique evidence, exceptions, or reasoning not safely represented elsewhere.
-
-The writer synthesizes its own active account; it does not turn it into a
-pointer-only list or run the gardener automatically. A destination that is
-missing, archived, stale for the claim, still draft/unmerged, or incompletely
-indexed blocks pruning of that material. So does unresolved unique evidence.
-Keep the needed substance and state the limitation rather than trimming for
-size. Partial promotion permits compaction only of the verified portions.
-
-**Retention boundary:** "preserve the complete original" forbids the gardener
-from replacing its input capture with summaries or pointers. It does not turn
-the writer's already-mutable current-state synthesis into an immutable
-transcript. Normal writer synthesis can remove obsolete working state and
-verified repetition, but not silently discard intentionally retained unique
-evidence. If safe preservation is uncertain, leave that material intact. This
-version does not promise snapshots of every intermediate capture revision.
-
-## 6. Completed-source retention and archival
-
-On a completed capture, promote useful topics while preserving the complete
-source body and stable identifiers. Keep a capture current for continuation
-only where that role is still justified; do not confuse that with canonical
-topic authority.
-
-Retire only with explicit scope, a reason, non-live coordination, and verified
-destinations for knowledge that current retrieval should use. Use in-place
-archive metadata and meaningful source/successor links; do not claim that one
-topic note supersedes every topic of a multi-topic capture. Where coverage is
-partial, retain the source and document what is still unmatched.
-
-No source deletion, move, pointer-only replacement, automatic unarchive,
-source-date fabrication, or Git-history-only provenance is introduced.
+Ordinary editable non-capture notes can be deliberately archived in place when
+genuinely superseded. Gardening does not archive captures. Separate explicit
+capture retirement is outside this version. Imported originals remain
+immutable; no source deletion, move, pointer-only replacement, automatic
+unarchive or Git-history-only provenance is introduced.
 
 ## 7. Retrieval contract
 
@@ -179,47 +169,41 @@ it. The helper and policy do not change BM's search ranking or filtering.
 
 ## 8. Implementation increments and rollout
 
-1. Record this contract and keep lifecycle unknown-by-default for legacy notes.
-2. Update gardener decomposition/coverage and preserve-original instructions.
-3. Expose advisory capture/source protection in read-only inventory.
-4. Update capture creation, promotion-aware synthesis, completion/resumption and
-   existing archive guard; keep stable lookup and unrelated metadata.
-5. Align retrieval snippet, README, ecosystem rationale, and synthetic scenarios.
-6. Run helper and policy-consistency regressions, then a reviewed LLM scenario.
-7. Obtain independent privacy review of outgoing public content/metadata, publish
-   a feature PR, and leave activation/migration/merge separately reviewable.
+Align both skills, helper, retrieval guidance, README and fictional inputs with
+this design. Run helper and policy regressions; obtain independent code and
+public-privacy reviews before publishing the feature branch. Keep operational
+BM acceptance, installation, migration and merge separately reviewable.
 
 The plugin packages the skills but does not overwrite a higher-priority
 standalone capture skill. Deployment must inspect effective paths before
-claiming the coordinated contract is active. Updating public source is not
+claiming this metadata contract is active. Updating public source is not
 permission to replace installed skills or edit real BM records.
 
 ## 9. Validation and remaining consultation
 
 Automated tests exercise the read-only helper against synthetic frontmatter,
-timestamp/lifecycle compatibility, script immutability, bundled paths, and
+timestamp comparisons, legacy metadata, script immutability, bundled paths, and
 cross-document policy consistency. They do **not** prove LLM semantic
 decomposition or lossless promotion.
 
 The [recorded source-only tabletop review](../tests/capture-lifecycle-scenarios.md#recorded-source-only-tabletop-review-2026-10-12)
-exercises fictional topic coverage and a conditional handoff. It is a
+exercises fictional topic coverage and an earlier conditional handoff. That
+handoff is historical, not part of this simplified version. It is a
 same-author reasoning check, not independent consultation or operational BM
 verification. It preserves uncertainty about unregistered/unmerged destinations
 and documents remaining acceptance rather than treating helper tests as proof.
 
-The manual synthetic scenarios test active/unknown/completed/reopened/archived
-captures, partial and unavailable promotion, changing evidence, concurrency,
-and retrieval. A successful LLM trial must account for all useful topics,
-preserve original evidence, and demonstrate smaller realistic reads. No live
-corpus trial is claimed by helper tests.
+The current manual scenarios test unchanged capture bodies, successful stamps,
+ordinary repeat-run skipping, later capture updates, incomplete work, immutable
+sources, archive guards and useful retrieval. A successful operational trial
+must account for all useful topics, preserve source bodies, demonstrate smaller
+realistic reads and verify real BM metadata/index behavior. No live corpus
+trial is claimed by helper tests.
 
 Independent ChatGPT critique remains an unmet consultation step, not a signoff
 requirement or permission gate that transfers decisions away from the
 maintainer. Questions to resolve when authentication is available:
 
-- Is explicit completion/resumption clear without confusing automatic checkpoints?
-- Does the writer/gardener retention boundary preserve useful history without
-  forcing a new snapshot system?
-- Are promotion checks sufficient for draft or mutable destinations?
-- Is source/canonical authority clear enough to avoid duplicate current truth?
-- Can any metadata or procedure be removed without losing the safety boundary?
+- Are subject notes complete enough to answer useful questions and retain why?
+- Does the simple review-stamp rule avoid skipped unfinished work and repeat loops?
+- Is source/subject-note authority clear enough to avoid duplicate current truth?

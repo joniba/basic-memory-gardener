@@ -7,12 +7,12 @@ A single, **LLM-driven maintenance skill** for a [Basic Memory](https://github.c
 ## Start here
 
 - **[memory-garden skill](skills/memory-garden/SKILL.md)** — the complete operational instructions.
-- **[Customized memory-capture skill](skills/memory-capture/SKILL.md)** — same-thread synthesis, verified compact handoffs and explicit lifecycle/archive guards; ordinary notes omit `archived`.
+- **[Customized memory-capture skill](skills/memory-capture/SKILL.md)** — same-thread synthesis, preserved gardening timestamps and archive guards; ordinary notes omit `archived`.
 - **[Global Copilot retrieval instructions](snippets/copilot-global-instructions.md)** — a copy-ready, always-on section for searches, bounded reads, graph navigation, freshness, and archive-aware answers.
 - **[Related community work and archiving notes](docs/ecosystem-and-archiving.md)** — projects, upstream behavior, and limitations.
 - **[Bundled candidate inventory script](skills/memory-garden/scripts/Find-GardenCandidates.ps1)** — shipped with the skill; reads explicit canonical `modified` and `last_gardened_at` from frontmatter without a private state file or filesystem/Git timestamp comparison.
-- **[Capture lifecycle design](docs/capture-lifecycle-design.md)** — incremental roles, ownership, promotion, compact handoffs and completion/resumption contract.
-- **[Synthetic acceptance scenarios](tests/capture-lifecycle-scenarios.md)** — lossless topic coverage and lifecycle cases; helper tests do not prove an LLM completed them.
+- **[Capture and gardening design](docs/capture-lifecycle-design.md)** — separate responsibilities, preserved capture bodies, subject notes and incremental review.
+- **[Synthetic acceptance scenarios](tests/capture-lifecycle-scenarios.md)** — topic coverage, body preservation and review-stamp cases; helper tests do not prove an LLM completed them.
 
 ### Captures and topical knowledge
 
@@ -21,18 +21,19 @@ reusable knowledge across sessions. Keep both in the existing corpus, linked,
 without making two competing current accounts or replacing captures with
 pointer-only stubs. Existing paths remain stable.
 
-The gardener reads potentially active captures and extracts into canonical
-homes without touching the originals. A deep pass reports each useful topic
-as already covered, updated, created, or explicitly deferred. Once a promotion
-is verified and available in the authoritative corpus, the owning capture
-writer can keep concise context/links plus open work, authority, exceptions and
-unpromoted evidence rather than repeating an encyclopedia.
+One gardener maintains reusable subject notes; sessions maintain their own
+captures. The gardener preserves every capture body, active or finished.
+After successful processing, it updates the capture's `last_gardened_at`
+review timestamp using a metadata-only edit. Captures changed afterward become
+eligible again; unchanged captures can be skipped. A deep pass reports each
+useful topic as already covered, updated, created, or explicitly deferred.
+Partial, deferred or failed work does not advance the source review stamp.
 
-New capture metadata is `note_role: session_capture` and
-`capture_status: active`; completed is recorded only with explicit confirmation.
-Unknown legacy lifecycle is potentially active. Reopening is an authorized
-transition to active, not automatic checkpoint behavior. Completion does not
-imply archival; archived capture reactivation remains explicit.
+Capture files do not become smaller: future questions can read the shorter
+subject notes instead. No new completion/resumption or promotion-driven
+capture-shortening workflow is added. Legacy status labels are preserved, not
+used to decide whether the gardener may alter the body. Archived capture
+reactivation remains a separate explicit action.
 
 This is a source-policy candidate, not an automatic corpus migration or
 installed capture replacement. Independent ChatGPT consultation remains pending
@@ -77,20 +78,21 @@ discovery. Pass the exact directory path, not a skill name: removing by name
 can delete a standalone skill. Unregistering a custom directory does not remove
 the source checkout.
 
-### Use the lifecycle-aware memory-capture skill
+### Use the gardening-aware memory-capture skill
 
 The existing [Copilot capture bridge](https://github.com/joniba/basic-memory-copilot-bridge)
 calls the skill named `memory-capture`; it does **not** write notes itself. The
 plugin includes a **modified copy of upstream `memory-capture` with the same
-skill name**. It preserves upstream synthesis and identity, adds explicit
-completion/resumption and verified-promotion guards, and refuses to overwrite
-an explicitly archived checkpoint without authorization. New checkpoints use
-the capture role and active status, and omit `archived`.
+skill name**. It preserves upstream synthesis, identity and existing
+`last_gardened_at`, maintains explicit `modified` for actual capture updates,
+and refuses to overwrite an explicitly archived checkpoint without
+authorization. New checkpoints use the capture role and omit `archived`.
+Capture itself never creates or advances the gardening review stamp.
 
 Installing the plugin does not delete or overwrite existing personal skills.
 A higher-precedence standalone `memory-capture` may still win. Inspect the
 effective path with `copilot skill list --json`; do not claim the archive-aware
-copy and its lifecycle contract are active unless that path points into this plugin. Preserve/back up a
+copy and its metadata contract are active unless that path points into this plugin. Preserve/back up a
 standalone copy and obtain the applicable approval before retiring it. The
 gardener itself protects live checkpoints regardless of which capture copy is
 active. Do not change the bridge extension, thresholds, or timers to resolve a
@@ -112,21 +114,21 @@ $skillDir = '<absolute installed memory-garden skill directory>'
 The helper reads top-level frontmatter scalars plus file sizes/paths, not note bodies. It compares `modified` with `last_gardened_at` and reports archive state. A note is normally skippable when both timestamps are valid, explicit and offset-aware, and `modified <= last_gardened_at`. Missing or ambiguous `modified` is **unknown**, not unchanged; it remains eligible. BM exposes canonical frontmatter `modified` as indexed `updated_at`, but for notes lacking explicit `modified` it may fall back to filesystem mtime. The gardener does **not** use that fallback to certify a note as unchanged.
 
 It also reads role/capture fields and reports conservative advisory protection.
-A thread-keyed or role-marked capture without valid completion is potentially
-live; duplicate lifecycle keys are ambiguous, not permission to edit.
-Conflicting archive markers retain any true protection; unterminated
-frontmatter cannot certify completion or unchanged state.
+Every identified capture has `capture-body` protection regardless of status;
+`CaptureStatus` reports the raw legacy value without interpreting it as edit
+authority. Conflicting archive markers retain any true protection; duplicate
+timestamps and unterminated frontmatter remain eligible.
 `source_thread_id` does not turn a derived topic into a capture. Explicit
 `source_evidence` remains read-only. These hints do not discover every writer
-or override the skill's coordination/retention rules.
+or override the skill's body-preservation and scope rules.
 
-Use `-IncludeUnchanged` for a full inventory. For targeted work, BM compact search/recent activity may be cheaper than a broad scan. If the script cannot run, the gardener falls back to BM directory/search/metadata tools. It never stamps live session checkpoints or immutable source documents just to record review.
+Use `-IncludeUnchanged` for a full inventory. For targeted work, BM compact search/recent activity may be cheaper than a broad scan. If the script cannot run, the gardener falls back to BM directory/search/metadata tools. It stamps successfully processed authored captures, including active ones; it never stamps immutable sources or already archived captures without separate authority.
 
 ### BM-native operations and safe edits
 
 The gardener uses `search_notes(compact=True)`, paged `list_directory` and `recent_activity` for discovery, `read_note(include_content=False)` for cheap identity/checksum checks, bounded `read_note(start_line, end_line)` for selected evidence, and `build_context(compact=True, depth=1)` for relevant relations. It uses guarded `edit_note`/`write_note` for changes, avoiding full note reads and rewrites unless the task genuinely requires them.
 
-All writes target the **already registered BM project**. The skill does not create Git worktrees, register a second BM project, or trigger a duplicate full-corpus index. A first run defaults to read-only planning. For apply, coordinate with concurrent session capture (ideally a maintenance window), use revision checks, verify BM indexing, and inspect a private Git diff when available. No automatic branch switching, Git commit, merge, or change to the capture bridge.
+All writes target the **already registered BM project**. The skill does not create Git worktrees, register a second BM project, or trigger a duplicate full-corpus index. A first run defaults to read-only planning. Run one gardener, use revision checks, verify BM indexing, and inspect a private Git diff when available. No capture pause, new lock protocol, automatic branch switching, Git commit, merge, or change to the capture bridge.
 
 ### Example requests
 
@@ -164,12 +166,13 @@ live in [`tests/Find-GardenCandidates-tests/`](tests/Find-GardenCandidates-tests
 not in a Basic Memory project. `tests/test_policy.py` runs the helper against
 these inputs and separately checks general skill/package consistency.
 Synthetic frontmatter fixtures exercise the actual read-only
-helper, existing timestamp behavior, lifecycle ambiguity and scope safety.
+helper, review-stamp comparisons, legacy metadata ambiguity and scope safety.
 Tests verify bundled links and cross-skill policy statements; they are not proof
 of semantic LLM promotion. Use the synthetic acceptance scenarios for that
 separate review and report whether it actually ran.
 
 The scenarios also record a source-only, same-author tabletop review: concrete
-fictional topic coverage, a smaller-note answer and conditional writer handoff.
+fictional topic coverage, a smaller-note answer and a historical handoff proposal
+that is no longer part of the simplified design.
 Its assumptions and missing BM/tool verification are explicit; it is not
 independent ChatGPT feedback or a live-corpus acceptance result.

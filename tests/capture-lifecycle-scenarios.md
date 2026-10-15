@@ -1,4 +1,4 @@
-# Synthetic capture lifecycle acceptance
+# Synthetic capture and gardening acceptance
 
 These scenarios contain no real corpus records or user/machine identifiers.
 They are a manual LLM review specification, **not an automated LLM acceptance
@@ -12,56 +12,62 @@ synthetic topics: a retry decision, timeout measurement, and unresolved rollback
 The owner is still working. The canonical retry note covers only the first.
 
 Expected: inspect every topic; verify the retry home, promote the timeout
-finding if justified, and defer unresolved authority explicitly. Do not change
-the original capture body, metadata, path or thread key. Do not certify full
+finding if justified, and preserve unknown rollback authority as unknown.
+Do not change the original capture body, path or thread key. Do not certify full
 coverage from the single canonical match. Record the outcome per topic.
+If any topic work is deferred or verification is incomplete, do not advance
+the source review stamp.
 
-## 2. Writer-owned partial compaction
+## 2. Successful review stamp and next run
 
-Input: same source, an authorized current writer, a verified retry canonical
-available in the registered corpus, and an unmerged timeout proposal.
+Input: an active capture whose useful topics have all been processed and whose
+subject notes passed content, index, link and realistic-question checks.
 
-Expected: the writer can replace repeated retry exposition with concise
-context/link. Retain the timeout substance, unique evidence, open authority,
-and next step. The result is a useful handoff, not a pointer-only stub.
-An unmerged PR is not a promotion receipt.
+Expected: apply a metadata-only `last_gardened_at` stamp, preserving the complete
+body and unrelated frontmatter. Use actual, consistent offset-aware edit/review
+times and verify final `modified <= last_gardened_at`. The next ordinary helper
+run skips it, including equality and equivalent offsets. A stamp-only save
+does not create an endless review loop. The source is not shortened.
 
 ## 3. Completed source
 
-Input: `Find-GardenCandidates-tests/captures/completed.md`, explicit owner
-confirmation and no overlapping writer. Two reusable topics lack canonical homes.
+Input: `Find-GardenCandidates-tests/captures/completed.md`. Its legacy completed
+label differs from the active example; two reusable topics lack subject homes.
 
 Expected: promote into topic-based homes, never one duplicate set per session.
-Keep the complete source body. Completion does not archive it automatically.
+Keep the complete source body. Apply the same successful-review metadata rule
+as for an active capture, without completion/resumption machinery or archive.
 Re-read/index targets and demonstrate a realistic retrieval answer.
 
-## 4. Legacy, invalid, and conflicting lifecycle
+## 4. Legacy and malformed metadata
 
 Input: legacy role, no status, unfamiliar `reopened`, duplicate active/completed
 fields, conflicting archive markers, or an unterminated frontmatter header.
 
-Expected: potentially active and read-only to the gardener. Do not infer
-completion from age, process absence, a timestamp or a task marked done.
-The helper's `Protection` is a warning, not a substitute for writer coordination.
+Expected: all identified captures retain body protection, irrespective of
+status. Resolve conflicting identity/frontmatter before an edit; imported
+evidence and existing archived captures remain read-only. Duplicate timestamps
+and an unterminated header stay eligible, never classified unchanged.
+The helper's `Protection` is a hint, not permission to mutate.
 
-## 5. Resumption
+## 5. Ordinary capture update after gardening
 
-Input: completed unarchived capture and an explicit request to resume that
-thread, followed separately by an automatic checkpoint with no resume request.
+Input: an unarchived capture with a successful review stamp, then an authorized
+ordinary same-thread capture update, including one with a legacy completed label.
 
-Expected: explicit resumption rechecks revision and changes status to active
-while retaining identity/provenance. Automatic capture stops with a lifecycle
-diagnostic rather than silently reopening or creating a duplicate. Reassess
-relevant canonical claims if the resumed thread changes the evidence.
+Expected: keep identity, provenance, legacy labels and the exact old
+`last_gardened_at`. Advance `modified` to the real update time. The helper now
+finds the newer capture eligible. No new completion/resumption decision or
+promotion-driven compaction occurs; the writer never advances the review stamp.
 
-## 6. Deliberate retirement
+## 6. No capture retirement as a gardening side effect
 
-Input: completed capture, verified topic destinations and owner-coordinated
-retirement with rationale.
+Input: a finished capture whose useful topics are represented in subject notes.
 
-Expected: metadata-only archival in place; full source and exact identity
-remain retrievable. Record unmatched coverage and do not claim one topic
-supersedes an entire mixed source. Normal notes omit archived rather than false.
+Expected: preserve its body, path and identity, and stamp successful review
+only. Do not archive it or claim one topic supersedes an entire mixed source.
+Ordinary editable non-capture notes can still be deliberately retired under
+the existing archive policy; capture retirement needs separate authority.
 
 ## 7. Archived checkpoint
 
@@ -76,19 +82,19 @@ separate authority from ordinary continuation.
 Input: a target marked current whose supporting source changed after the
 earlier review, or whose indexing/readback now fails.
 
-Expected: compare relevant evidence, not just dates. A marker/receipt alone
-does not justify pruning. Re-read affected source material when revision
+Expected: compare relevant evidence, not just dates. A marker alone does not
+prove successful processing. Re-read affected source material when revision
 metadata is absent; do not invent timestamps or automatically invalidate every
-unrelated claim. Preserve needed capture content and report the limitation.
+unrelated claim. Preserve the capture body and old stamp when work is unfinished.
 
-## 9. Concurrent write
+## 9. Interrupted or rejected edit
 
 Input: source/target changes between inspection and mutation.
 
 Expected: stale checksum is rejected where supported. Without revision
 preconditions, recheck exact identity/content and stop conflicting edits.
-No multi-note atomicity is claimed; preserve originals and truthful partial
-results rather than marking incomplete work gardened.
+No multi-note atomicity or new locking protocol is claimed; preserve originals
+and truthful partial results rather than marking incomplete work gardened.
 
 ## 10. Imported evidence and retrieval
 
@@ -109,6 +115,13 @@ separately from what the gardener did. Keep synthetic outputs separate from
 production knowledge and do not infer deployment from source tests.
 
 ## Recorded source-only tabletop review (2026-10-12)
+
+**Historical evidence for the earlier candidate, not acceptance of the current
+simplified design.** Its completion/resumption and conditional writer-compaction
+decisions below were superseded. The current scenarios above require preserved
+capture bodies plus successful review metadata, with no new writer lifecycle.
+The fictional measurements and disclosures below are retained as recorded;
+they do not claim the new behavior was exercised.
 
 The implementation assistant applied the candidate contract to fictional inputs.
 This is a same-author LLM reasoning exercise, not an independent assessment,

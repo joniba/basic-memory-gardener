@@ -8,8 +8,8 @@
   Basic Memory's indexed 'updated_at' may otherwise be an mtime fallback.
   No hashes, databases, manifests, budgets, LLM calls, or file writes.
   Missing 'archived' means NOT archived. Reads top-level frontmatter scalars.
-  Role/capture protection is advisory. Completion is never inferred from age;
-  the helper cannot detect every concurrent writer or authorize mutation.
+  Role/capture body protection is advisory, independent of legacy status.
+  The helper does not authorize mutation.
 .EXAMPLE
   # Run from the installed memory-garden skill's scripts directory:
   .\Find-GardenCandidates.ps1 -Root 'C:\basic-memory\main'
@@ -49,7 +49,7 @@ function Get-FrontmatterValues {
         NoteRole = $null; CaptureStatus = $null; HasThreadId = $false
         HasCaptureStatus = $false; SawCaptureRole = $false
         SawSourceRole = $false; AmbiguousCaptureMetadata = $false
-        InvalidFrontmatter = $false
+        InvalidFrontmatter = $false; AmbiguousTimestamps = $false
     }
     $seen = @{}
     $reader = [System.IO.StreamReader]::new($FilePath)
@@ -69,8 +69,12 @@ function Get-FrontmatterValues {
                 $seen['archived'] = $true
                 $result.Archived = $result.Archived -or ($raw -ieq 'true')
             } elseif ($line -match '^modified:\s*(?<value>[^#]*?)\s*(?:#.*)?$') {
+                if ($seen.ContainsKey('modified')) { $result.AmbiguousTimestamps = $true }
+                $seen['modified'] = $true
                 $result.Modified = $Matches.value.Trim().Trim([char]39,[char]34)
             } elseif ($line -match '^last_gardened_at:\s*(?<value>[^#]*?)\s*(?:#.*)?$') {
+                if ($seen.ContainsKey('last_gardened_at')) { $result.AmbiguousTimestamps = $true }
+                $seen['last_gardened_at'] = $true
                 $result.LastGardenedAt = $Matches.value.Trim().Trim([char]39,[char]34)
             } elseif ($line -match '^(?<key>note_role|capture_status|thread_id):\s*(?<value>[^#]*?)\s*(?:#.*)?$') {
                 $key = $Matches.key
@@ -123,27 +127,20 @@ Get-ChildItem -LiteralPath $scanRoot -File -Recurse -Filter '*.md' | ForEach-Obj
     $modified = Convert-ExplicitOffsetTimestamp -Value $fm.Modified
     $gardened = Convert-ExplicitOffsetTimestamp -Value $fm.LastGardenedAt
     $isCapture = $fm.HasThreadId -or $fm.HasCaptureStatus -or $fm.SawCaptureRole
-    $captureStatus = if (-not $isCapture) {
-        $null
-    } elseif (-not $fm.AmbiguousCaptureMetadata -and $fm.CaptureStatus -ceq 'completed') {
-        'completed'
-    } elseif (-not $fm.AmbiguousCaptureMetadata -and $fm.CaptureStatus -ceq 'active') {
-        'active'
-    } else {
-        'unknown'
-    }
     $protection = if ($isCapture -and $fm.Archived) {
         'archived-capture'
-    } elseif ($isCapture -and $captureStatus -ne 'completed') {
-        'potentially-live-capture'
     } elseif ($fm.SawSourceRole) {
         'source-evidence'
+    } elseif ($isCapture) {
+        'capture-body'
     } else {
         'none'
     }
 
     $reason = if ($fm.InvalidFrontmatter) {
         'invalid-frontmatter'
+    } elseif ($fm.AmbiguousTimestamps) {
+        'ambiguous-timestamps'
     } elseif ([string]::IsNullOrWhiteSpace($fm.LastGardenedAt)) {
         'never-gardened'
     } elseif ($null -eq $gardened) {
@@ -168,9 +165,10 @@ Get-ChildItem -LiteralPath $scanRoot -File -Recurse -Filter '*.md' | ForEach-Obj
             Reason = $reason
             NoteRole = $fm.NoteRole
             IsCapture = $isCapture
-            CaptureStatus = $captureStatus
+            CaptureStatus = $fm.CaptureStatus
             Protection = $protection
             AmbiguousCaptureMetadata = $fm.AmbiguousCaptureMetadata
+            AmbiguousTimestamps = $fm.AmbiguousTimestamps
         }
     }
 }

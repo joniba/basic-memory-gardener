@@ -14,7 +14,7 @@ HELPER = ROOT / "skills" / "memory-garden" / "scripts" / "Find-GardenCandidates.
 
 def file_hashes():
     return {
-        str(path.relative_to(FIXTURES)): hashlib.sha256(path.read_bytes()).hexdigest()
+        path.relative_to(FIXTURES).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
         for path in FIXTURES.rglob("*.md")
     }
 
@@ -52,27 +52,27 @@ class InventoryTests(unittest.TestCase):
             raise AssertionError("The read-only inventory changed synthetic source files.")
 
     def test_all_scoped_markdown_files_are_discovered(self):
-        self.assertEqual(len(self.rows), 17)
+        self.assertEqual(set(self.rows), set(file_hashes()))
 
-    def test_active_and_unknown_captures_are_protected(self):
-        for name in ("active", "legacy", "duplicate-status", "unfamiliar-status", "status-only", "empty-thread"):
+    def test_all_captures_have_body_protection_regardless_of_status(self):
+        for name in ("active", "completed", "legacy", "duplicate-status", "unfamiliar-status", "status-only", "empty-thread"):
             with self.subTest(name=name):
                 row = self.rows[f"captures/{name}.md"]
                 self.assertTrue(row["IsCapture"])
-                self.assertEqual(row["Protection"], "potentially-live-capture")
+                self.assertEqual(row["Protection"], "capture-body")
         self.assertEqual(self.rows["captures/active.md"]["CaptureStatus"], "active")
-        self.assertEqual(self.rows["captures/legacy.md"]["CaptureStatus"], "unknown")
+        self.assertIsNone(self.rows["captures/legacy.md"]["CaptureStatus"])
 
-    def test_duplicate_lifecycle_is_not_completed(self):
+    def test_duplicate_legacy_status_does_not_relax_body_protection(self):
         row = self.rows["captures/duplicate-status.md"]
         self.assertTrue(row["AmbiguousCaptureMetadata"])
-        self.assertEqual(row["CaptureStatus"], "unknown")
+        self.assertEqual(row["Protection"], "capture-body")
 
     def test_completed_is_separate_from_archival_and_authority(self):
         row = self.rows["captures/completed.md"]
         self.assertEqual(row["CaptureStatus"], "completed")
         self.assertFalse(row["Archived"])
-        self.assertEqual(row["Protection"], "none")
+        self.assertEqual(row["Protection"], "capture-body")
         self.assertEqual(row["Reason"], "unchanged")
 
     def test_archived_capture_remains_protected(self):
@@ -84,12 +84,11 @@ class InventoryTests(unittest.TestCase):
         self.assertTrue(row["AmbiguousCaptureMetadata"])
         self.assertEqual(row["Protection"], "archived-capture")
 
-    def test_unterminated_frontmatter_cannot_certify_completion_or_unchanged(self):
+    def test_unterminated_frontmatter_cannot_certify_unchanged(self):
         row = self.rows["captures/unterminated.md"]
-        self.assertEqual(row["CaptureStatus"], "unknown")
         self.assertTrue(row["AmbiguousCaptureMetadata"])
         self.assertEqual(row["Reason"], "invalid-frontmatter")
-        self.assertEqual(row["Protection"], "potentially-live-capture")
+        self.assertEqual(row["Protection"], "capture-body")
 
     def test_source_reference_does_not_duplicate_capture_identity(self):
         row = self.rows["topics/canonical.md"]
@@ -111,6 +110,35 @@ class InventoryTests(unittest.TestCase):
         self.assertEqual(self.rows["topics/naive-timestamp.md"]["Reason"], "invalid-or-ambiguous-canonical-modified")
         self.assertEqual(self.rows["topics/invalid-watermark.md"]["Reason"], "invalid-watermark")
 
+    def test_reviewed_active_capture_with_equivalent_offsets_is_unchanged(self):
+        row = self.rows["captures/reviewed-active.md"]
+        self.assertEqual(row["CaptureStatus"], "active")
+        self.assertEqual(row["Protection"], "capture-body")
+        self.assertEqual(row["Reason"], "unchanged")
+
+    def test_metadata_stamp_equality_does_not_cause_repeat_review(self):
+        row = self.rows["captures/reviewed-equal.md"]
+        self.assertEqual(row["Modified"], row["LastGardenedAt"])
+        self.assertEqual(row["Reason"], "unchanged")
+
+    def test_later_capture_modification_is_eligible_with_old_stamp(self):
+        row = self.rows["captures/changed-after-review.md"]
+        self.assertEqual(row["Reason"], "modified-since-gardening")
+        self.assertEqual(row["LastGardenedAt"],
+                         self.rows["captures/reviewed-equal.md"]["LastGardenedAt"])
+
+    def test_duplicate_timestamps_cannot_certify_unchanged(self):
+        for name in ("duplicate-modified", "duplicate-watermark"):
+            with self.subTest(name=name):
+                row = self.rows[f"topics/{name}.md"]
+                self.assertTrue(row["AmbiguousTimestamps"])
+                self.assertEqual(row["Reason"], "ambiguous-timestamps")
+
+    def test_imported_evidence_with_capture_identity_remains_immutable(self):
+        row = self.rows["sources/capture-identity.md"]
+        self.assertTrue(row["IsCapture"])
+        self.assertEqual(row["Protection"], "source-evidence")
+
     def test_default_inventory_skips_only_timestamp_unchanged_notes(self):
         result = inventory(include_unchanged=False)
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -118,6 +146,11 @@ class InventoryTests(unittest.TestCase):
         self.assertNotIn("captures/completed.md", names)
         self.assertNotIn("captures/legacy.md", names)
         self.assertNotIn("topics/canonical.md", names)
+        self.assertNotIn("captures/reviewed-active.md", names)
+        self.assertNotIn("captures/reviewed-equal.md", names)
+        self.assertIn("captures/changed-after-review.md", names)
+        self.assertIn("topics/duplicate-modified.md", names)
+        self.assertIn("topics/duplicate-watermark.md", names)
         self.assertIn("captures/duplicate-status.md", names)
 
     def test_folder_scope_and_escape_rejection(self):
@@ -152,22 +185,32 @@ class PolicyConsistencyTests(unittest.TestCase):
             text = (ROOT / "skills" / name / "SKILL.md").read_text(encoding="utf-8")
             self.assertIn("capture-lifecycle-design.md", text)
             self.assertIn("pointer-only", text)
-            self.assertIn("capture_status", text)
-            self.assertIn("completed", text)
-            self.assertIn("unmerged", text)
+            self.assertIn("last_gardened_at", text)
+            self.assertIn("modified", text)
 
-    def test_gardener_reports_topic_coverage_without_editing_live_captures(self):
-        text = (ROOT / "skills" / "memory-garden" / "SKILL.md").read_text(encoding="utf-8")
+    def test_gardener_preserves_bodies_and_stamps_successfully_processed_captures(self):
+        text = " ".join((ROOT / "skills" / "memory-garden" / "SKILL.md").read_text(encoding="utf-8").split())
         self.assertIn("already covered | update | create | defer", text)
-        self.assertIn("Do not write the topic ledger into a potentially active capture", text)
+        self.assertIn("including active ones", (ROOT / "README.md").read_text(encoding="utf-8"))
+        self.assertIn("Keep topic outcomes in the run report, not in the capture body", text)
+        self.assertIn("partial, deferred, failed or proposal-only", text)
+        self.assertIn("active or finished", text)
+        self.assertIn("metadata-only", text)
         self.assertIn("complete source body", text)
 
-    def test_capture_preserves_guards_and_partial_promotion(self):
+    def test_capture_preserves_stamp_and_guards_without_new_lifecycle_or_compaction(self):
         text = (ROOT / "skills" / "memory-capture" / "SKILL.md").read_text(encoding="utf-8")
         self.assertIn("Never filter exact thread identity lookup by archive state", text)
-        self.assertIn("Partial promotion permits compaction only of the verified portions", text)
-        self.assertIn("An automatic checkpoint alone must stop", text)
         self.assertIn("preserving unrelated frontmatter", text)
+        self.assertIn("existing `last_gardened_at` exactly", text)
+        self.assertIn("do not create, advance or clear it", text)
+        self.assertNotIn("capture_status: active", text)
+        self.assertNotIn('"capture_status":', text)
+        self.assertNotIn("Compact handoffs after verified promotion", text)
+        self.assertNotIn("An automatic checkpoint alone must stop", text)
+
+    def test_local_decisions_directory_is_git_ignored(self):
+        self.assertIn("/.local/", (ROOT / ".gitignore").read_text(encoding="utf-8").splitlines())
 
     def test_inventory_does_not_use_file_or_git_timestamps_or_write(self):
         text = HELPER.read_text(encoding="utf-8")

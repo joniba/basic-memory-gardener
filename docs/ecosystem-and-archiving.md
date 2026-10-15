@@ -17,27 +17,24 @@ Research notes for the **BM-native, LLM-first skill with a lightweight read-only
 
 ## Capture continuity versus canonical knowledge
 
-The [incremental lifecycle design](capture-lifecycle-design.md) distinguishes a
+The [capture and gardening design](capture-lifecycle-design.md) distinguishes a
 mutable session handoff from reusable canonical knowledge. The gardener
 preserves original capture bodies, including completed sources, and reports
 topic outcomes rather than using line removals as a success metric. A
-potentially active capture is read-only to the gardener, but useful knowledge
-can still be extracted elsewhere.
+capture, active or finished, can receive successful review metadata while its
+body, identity and path remain unchanged. Capture files do not shrink; the
+benefit is that future questions can read smaller reusable subject notes.
 
-The owning writer's normal same-note synthesis remains mutable. After actual
-promotion is verified in the authoritative corpus, it can retain concise
-context and links plus unmatched evidence, constraints, authority and next
-steps. A draft/unmerged note or self-declared current marker does not justify
-pruning. This is not a promise to preserve snapshots of every intermediate
-capture revision, nor permission to replace final sources with pointer-only
-stubs. No new snapshot service or separate archive project is introduced.
-
-`capture_status: active | completed` is explicit continuity metadata;
-unknown is potentially active. Completion is coordinated, reopening is
-authorized, and an automatic checkpoint cannot silently reopen a completed
-capture. This status is independent of knowledge currency and archive
-retirement. Role metadata guides retrieval but must not exclude legacy notes.
-The helper exposes advisory protection only, never write authority.
+One gardener maintains subject notes; sessions maintain their own captures.
+No new completion/resumption workflow, writer compaction feature or lock
+protocol is needed. Existing capture status labels are preserved, not used to
+relax body protection. The owning writer keeps normal same-note synthesis and
+preserves `last_gardened_at`, advancing `modified` for its actual updates.
+Role metadata guides retrieval but must not exclude legacy notes. Imported
+evidence stays immutable. A draft/unmerged note or self-declared current marker
+does not prove successful processing; deferred or unverified work leaves the
+source review stamp unchanged. No snapshot service or separate archive project
+is introduced.
 
 ## Archiving: what a folder does and does not do
 
@@ -61,13 +58,13 @@ archive_reason: <why no longer current>
 knowledge_status: superseded
 ~~~
 
-`knowledge_status: superseded` is appropriate only when a verified successor exists; otherwise describe the actual reason. The [customized capture skill](../skills/memory-capture/SKILL.md) does **not** add `archived: false`; it guards against overwriting a checkpoint that has been explicitly archived. The [gardener skill](../skills/memory-garden/SKILL.md) handles archiving of safe, non-live notes, preserving original sources and relations.
+`knowledge_status: superseded` is appropriate only when a verified successor exists; otherwise describe the actual reason. The [customized capture skill](../skills/memory-capture/SKILL.md) does **not** add `archived: false`; it guards against overwriting a checkpoint that has been explicitly archived. The [gardener skill](../skills/memory-garden/SKILL.md) handles archiving of ordinary editable non-capture notes, preserving original sources and relations. Capture retirement is outside this gardening version.
 
 **Ordinary retrieval:** search without an archive equality filter, then exclude `archived: true` hits from current answers. `metadata_filters={"archived": False}` would hide normal unmarked notes. Explicit archived:true searches are **discouraged except when the user specifically requests historical information, old-vs-new comparison, or another historical perspective**. The gardener's own internal maintenance review is a separate exception. If archived notes dominate results, use alternate queries/pagination or combine separate missing-field and explicit-false searches; don't silently fall back to archived notes as current authority.
 
-**Lightweight incremental review:** Basic Memory's canonical note timestamp is top-level YAML frontmatter `modified`, projected as indexed `updated_at`. For legacy notes without explicit `modified`, BM may derive `updated_at` from filesystem mtime; the indexed value alone does not prove the note carries a canonical timestamp ([BM domain model](https://github.com/basicmachines-co/basic-memory/blob/main/docs/DOMAIN_MODEL.md)). The gardener compares **explicit, valid, offset-aware `modified`** with its own `last_gardened_at` watermark, not filesystem mtime or Git commit dates. Missing/invalid canonical timestamps remain eligible; do not invent historic timestamps to make notes skippable. The [bundled PowerShell script](../skills/memory-garden/scripts/Find-GardenCandidates.ps1) reads only frontmatter and file sizes/paths for local broad inventories; no hash manifest or private database. Live checkpoints and immutable source documents are not stamped without special authorization. Writers should maintain `modified` for substantive changes if they want reliable incremental skipping.
+**Lightweight incremental review:** Basic Memory's canonical note timestamp is top-level YAML frontmatter `modified`, projected as indexed `updated_at`. For legacy notes without explicit `modified`, BM may derive `updated_at` from filesystem mtime; the indexed value alone does not prove the note carries a canonical timestamp ([BM domain model](https://github.com/basicmachines-co/basic-memory/blob/main/docs/DOMAIN_MODEL.md)). The gardener compares **explicit, valid, offset-aware `modified`** with its own `last_gardened_at` watermark, not filesystem mtime or Git commit dates. Missing/invalid/duplicate canonical timestamps remain eligible; do not invent historic timestamps to make notes skippable. The [bundled PowerShell script](../skills/memory-garden/scripts/Find-GardenCandidates.ps1) reads only frontmatter and file sizes/paths for local broad inventories; no hash manifest or private database. Successfully processed authored captures, including active ones, receive a metadata-only review stamp; preserve their complete bodies. Set real edit/review times consistently so the stamp itself does not trigger endless re-review. Immutable sources and already archived captures are not stamped without separate authority. Capture writers preserve the stamp and maintain real `modified` for their updates.
 
-This is the **lowest-risk identity/relationship policy**: metadata changes without moves leave paths and link targets stable. Gardening uses the **already registered BM project's** MCP read/search/graph/edit operations, not a second project or worktree; verify BM indexing and graph after edits. Archive state is not automatically propagated to graph expansion. Coordinate apply with any concurrent capture writer; BM revision preconditions protect individual edits but do not make a multi-note pass atomic.
+This is the **lowest-risk identity/relationship policy**: metadata changes without moves leave paths and link targets stable. Gardening uses the **already registered BM project's** MCP read/search/graph/edit operations, not a second project or worktree; verify BM indexing and graph after edits. Archive state is not automatically propagated to graph expansion. Run one gardener and preserve capture bodies; BM revision preconditions protect individual edits but do not make a multi-note pass atomic.
 
 ### Why not a sibling archive project now?
 
@@ -90,7 +87,7 @@ Use temporary non-sensitive notes or a safe existing fixture, not production-wid
 7. Check whether an archived note outranks a current note for a representative query; if so, evaluate a client-side retrieval rule or future native search filter.
 8. Confirm folder-scoped gardening never edits notes outside the authorized subtree, even when the search index returns them.
 9. Confirm a successfully stamped, unchanged authored note with explicit canonical `modified` is skipped by the helper; a later substantive edit that advances `modified` makes it eligible. No filesystem/Git timestamp or post-stamp tolerance is used.
-10. Confirm the gardener never stamps an active checkpoint merely to record a review.
+10. Confirm successful full processing stamps an active capture without changing its body; partial, deferred or failed processing leaves its old stamp unchanged. A later capture update preserves the stamp and advances `modified`.
 11. Confirm a note missing explicit `modified` remains eligible even if BM indexed `updated_at` is present (it may be an mtime fallback); invalid/naive timestamps are not silently assumed comparable.
 12. Confirm compact `search_notes` and compact `build_context` omit note bodies, `read_note(include_content=False)` provides identity/checksum without body, and bounded `read_note` reads just the required lines.
 13. Confirm guarded BM `edit_note` refuses a stale `expected_checksum` and a successful change becomes searchable/linked after indexing catches up.

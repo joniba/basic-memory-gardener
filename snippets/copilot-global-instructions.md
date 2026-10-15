@@ -21,12 +21,12 @@ A canonical note may lag newer source evidence; a retained synthesis is not
 proof that every claim in it is true. Inspect source sections/revisions and
 limitations where the distinction matters.
 
-`capture_status: active | completed` is continuity metadata, independent of
-currency/archive state. Missing or unfamiliar capture status means potentially
-active. Completion or promotion does not automatically archive a capture.
+Legacy capture status labels do not control ordinary retrieval or gardening.
+The gardener preserves capture bodies and updates only successful review
+metadata; sessions maintain their own capture summaries and preserve that stamp.
 Normal retrieval does not close/reopen, stamp, compact, or archive notes.
-An exact `thread_id` lookup must find the original even when completed or
-archived; it must never create a second identity by filtering the original out.
+An exact `thread_id` lookup must find the original even when archived; it must
+never create a second identity by filtering the original out.
 Current answers should not treat a draft branch or unmerged topic note as
 available canonical authority merely because it contains proposed promotion.
 
